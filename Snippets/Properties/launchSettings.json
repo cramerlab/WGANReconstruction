@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Snippets": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

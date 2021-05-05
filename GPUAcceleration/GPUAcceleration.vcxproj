@@ -1,0 +1,189 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="einspline\bspline.h" />
+    <ClInclude Include="einspline\bspline_base.h" />
+    <ClInclude Include="einspline\bspline_create.h" />
+    <ClInclude Include="einspline\bspline_eval_std_s.h" />
+    <ClInclude Include="einspline\bspline_structs.h" />
+    <ClInclude Include="einspline\config.h" />
+    <ClInclude Include="Functions.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Angles.cpp" />
+    <ClCompile Include="Bessel.cpp" />
+    <ClCompile Include="Correlation.cpp" />
+    <ClCompile Include="Cubic.cpp" />
+    <ClCompile Include="Device.cpp" />
+    <ClCompile Include="EER.cpp" />
+    <ClCompile Include="Einspline.cpp" />
+    <ClCompile Include="einspline\bspline_create.cpp" />
+    <ClCompile Include="FFT.cpp" />
+    <ClCompile Include="FSC.cpp" />
+    <ClCompile Include="Memory.cpp" />
+    <ClCompile Include="Post.cu" />
+    <ClCompile Include="Projector.cpp" />
+    <ClCompile Include="SparseEigen.cpp" />
+    <ClCompile Include="Symmetry.cpp" />
+    <ClCompile Include="TiffNative.cpp" />
+    <ClCompile Include="WeightOptimization.cpp" />
+    <CudaCompile Include="Backprojection.cu" />
+    <CudaCompile Include="BoxNet2.cu" />
+    <CudaCompile Include="C2DNet.cu" />
+    <CudaCompile Include="Comparison.cu" />
+    <CudaCompile Include="CTF.cu" />
+    <CudaCompile Include="CubeNet.cu" />
+    <CudaCompile Include="CubicGPU.cu" />
+    <CudaCompile Include="Deconv.cu" />
+    <CudaCompile Include="Defects.cu" />
+    <CudaCompile Include="ParticleCTF.cu" />
+    <CudaCompile Include="ParticleMultiBody.cu" />
+    <CudaCompile Include="ParticleNMA.cu" />
+    <CudaCompile Include="ParticleShift.cu" />
+    <CudaCompile Include="ParticleSoftBody.cu" />
+    <CudaCompile Include="PCA.cu" />
+    <CudaCompile Include="Polishing.cu" />
+    <CudaCompile Include="RealspaceProjection.cu" />
+    <CudaCompile Include="Raycast.cu" />
+    <CudaCompile Include="Shift.cu" />
+    <CudaCompile Include="MPARefine.cu" />
+    <CudaCompile Include="Tools.cu" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{7976E078-C29C-487D-B354-F9ED8A497178}</ProjectGuid>
+    <RootNamespace>GPUAcceleration</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.1.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.1.targets" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)bin\</OutDir>
+    <IncludePath>..\..\libtiff\libtiff;..\..\libtiff\buildx64\libtiff;include;..\..\liblion;$(CUDA_PATH)\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <LibraryPath>..\..\libtiff\buildx64\libtiff\Release;..\..\liblion\x64\Debug;..\..\liblion\fftw;..\..\gtom\x64\Debug;$(CUDA_PATH)\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)Release\</OutDir>
+    <IncludePath>..\..\libtiff\libtiff;..\..\libtiff\buildx64\libtiff;include;..\..\liblion;$(CUDA_PATH)\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <LibraryPath>..\..\libtiff\buildx64\libtiff\Release;..\..\liblion\x64\Release;..\..\liblion\fftw;..\..\gtom\x64\Release;$(CUDA_PATH)\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN64;_DEBUG;FLOAT_PRECISION;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <OpenMPSupport>true</OpenMPSupport>
+      <MinimalRebuild>false</MinimalRebuild>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+      <EnableParallelCodeGeneration>false</EnableParallelCodeGeneration>
+      <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>DebugFastLink</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>cudart.lib;cudadevrt.lib;cufft.lib;cublas.lib;curand.lib;GTOM.lib;liblion.lib;fftw3f.lib;tiff.lib</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>copy "$(CUDA_PATH)\bin\cudart64_*.dll" "$(OutDir)"
+copy "$(CUDA_PATH)\bin\cufft64_*.dll" "$(OutDir)"
+copy "$(CUDA_PATH)\bin\cublas64_*.dll" "$(OutDir)"
+copy "$(CUDA_PATH)\bin\cudnn64_*.dll" "$(OutDir)"
+copy "$(CUDA_PATH)\bin\curand64_*.dll" "$(OutDir)"
+copy "$(CUDA_PATH)\bin\cusolver64_*.dll" "$(OutDir)"
+copy "..\..\libtiff\buildx64\libtiff\Release\tiff.dll" "$(OutDir)"
+copy "..\..\zlib-1.2.11\bin\zlib.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <CodeGeneration>compute_52,sm_52</CodeGeneration>
+      <PtxAsOptionV>true</PtxAsOptionV>
+      <GenerateLineInfo>true</GenerateLineInfo>
+      <GPUDebugInfo>false</GPUDebugInfo>
+      <HostDebugInfo>true</HostDebugInfo>
+      <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
+      <AdditionalCompilerOptions>
+      </AdditionalCompilerOptions>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Full</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN64;_CONSOLE;FLOAT_PRECISION;_ITERATOR_DEBUG_LEVEL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <OpenMPSupport>true</OpenMPSupport>
+      <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>cudart.lib;cudadevrt.lib;cufft.lib;cublas.lib;curand.lib;GTOM.lib;liblion.lib;fftw3f.lib;tiff.lib</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>copy "$(CUDA_PATH)\bin\cudart64_*.dll" "$(OutDir)"
+copy "$(CUDA_PATH)\bin\cufft64_*.dll" "$(OutDir)"
+copy "$(CUDA_PATH)\bin\cublas64_*.dll" "$(OutDir)"
+copy "$(CUDA_PATH)\bin\cudnn64_*.dll" "$(OutDir)"
+copy "$(CUDA_PATH)\bin\curand64_*.dll" "$(OutDir)"
+copy "$(CUDA_PATH)\bin\cusolver64_*.dll" "$(OutDir)"
+copy "..\..\libtiff\buildx64\libtiff\Release\tiff.dll" "$(OutDir)"
+copy "..\..\zlib-1.2.11\bin\zlib.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <CodeGeneration>compute_52,sm_52</CodeGeneration>
+      <PtxAsOptionV>true</PtxAsOptionV>
+      <FastMath>false</FastMath>
+      <Optimization>O3</Optimization>
+      <AdditionalCompilerOptions>
+      </AdditionalCompilerOptions>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+</Project>

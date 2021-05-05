@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "C2DNet": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

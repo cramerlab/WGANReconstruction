@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ParticleWGANDev": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

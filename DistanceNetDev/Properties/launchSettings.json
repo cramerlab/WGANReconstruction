@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DistanceNetDev": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}
