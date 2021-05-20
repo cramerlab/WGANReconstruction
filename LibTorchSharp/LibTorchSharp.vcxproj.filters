@@ -63,6 +63,9 @@
     <ClCompile Include="LibTorchSharp\MLP.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="LibTorchSharp\Pseudoatom_Operators.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LibTorchSharp\cifar10.h">
@@ -104,5 +107,16 @@
     <ClInclude Include="LibTorchSharp\MultiGPUModule.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="LibTorchSharp\Pseudoatom_Operators.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="LibTorchSharp\Pseudoatom_Operators_backend.cuh">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="LibTorchSharp\Pseudoatom_Operators_backend.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

@@ -17,6 +17,7 @@
     <ClCompile Include="LibTorchSharp\MLP.cpp" />
     <ClCompile Include="LibTorchSharp\MultiGPUModule.cpp" />
     <ClCompile Include="LibTorchSharp\ParticleWGAN.cpp" />
+    <ClCompile Include="LibTorchSharp\Pseudoatom_Operators.cpp" />
     <ClCompile Include="LibTorchSharp\ResNet.cpp" />
     <ClCompile Include="LibTorchSharp\THSAutograd.cpp" />
     <ClCompile Include="LibTorchSharp\THSData.cpp" />
@@ -33,6 +34,8 @@
     <ClInclude Include="LibTorchSharp\CustomModules.h" />
     <ClInclude Include="LibTorchSharp\MultiGPUModule.h" />
     <ClInclude Include="LibTorchSharp\parallel.h" />
+    <ClInclude Include="LibTorchSharp\Pseudoatom_Operators.h" />
+    <ClInclude Include="LibTorchSharp\Pseudoatom_Operators_backend.cuh" />
     <ClInclude Include="LibTorchSharp\THSAutograd.h" />
     <ClInclude Include="LibTorchSharp\THSData.h" />
     <ClInclude Include="LibTorchSharp\THSJIT.h" />
@@ -42,6 +45,9 @@
     <ClInclude Include="LibTorchSharp\Utils.h" />
     <ClInclude Include="Stdafx.h" />
     <ClInclude Include="UnixSal.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="LibTorchSharp\Pseudoatom_Operators_backend.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -66,6 +72,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.1.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -159,5 +166,6 @@ copy /y "C:\Program Files\NVIDIA Corporation\NvToolsExt\bin\x64\nvToolsExt64_1.d
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.1.targets" />
   </ImportGroup>
 </Project>
