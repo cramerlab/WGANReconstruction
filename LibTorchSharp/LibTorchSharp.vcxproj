@@ -11,6 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="LibTorchSharp\AtomProjector.cpp" />
     <ClCompile Include="LibTorchSharp\C2DNet.cpp" />
     <ClCompile Include="LibTorchSharp\cifar10.cpp" />
     <ClCompile Include="LibTorchSharp\DistanceNet.cpp" />

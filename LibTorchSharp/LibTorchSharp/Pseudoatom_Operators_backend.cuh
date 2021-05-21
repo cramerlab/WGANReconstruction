@@ -23,13 +23,13 @@ namespace at {
             std::tuple<Tensor, Tensor>
                  atoms_to_grid_3d_backward_cuda(const Tensor& grad_output, const Tensor& intensities, const Tensor& positions);
 
-            Tensor atoms_to_grid_3d_cuda(const Tensor& intensities, const Tensor& positions, int64_t z, int64_t y, int64_t x);
+            Tensor atoms_to_grid_3d_cuda(const Tensor& intensities, const Tensor& positions, int64_t x, int64_t y, int64_t z);
 
             // volume is (N, D, H, W) layout; positions are (N, W, 3), orientations are matrixes (N, 3,3) dimensional, projections will be (N, y,x) dimensional
-            Tensor projectAtoms(const Tensor& intensities, const Tensor& positions, const Tensor& orientation, int64_t z, int64_t y, int64_t x);
+            Tensor projectAtoms(const Tensor& intensities, const Tensor& positions, const Tensor& orientation, int64_t x, int64_t y, int64_t z);
 
             std::tuple<Tensor, Tensor, Tensor>
-                projectAtoms_backward_cuda(const Tensor& grad_output, const Tensor& intensities, const Tensor& positions, const Tensor& orientation, int64_t z, int64_t y, int64_t x);
+                projectAtoms_backward_cuda(const Tensor& grad_output, const Tensor& intensities, const Tensor& positions, const Tensor& orientation, int64_t x, int64_t y, int64_t z);
 
             Tensor fft_crop(const Tensor& fft_volume, int3 newDims);
         }

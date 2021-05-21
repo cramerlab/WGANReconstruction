@@ -24,6 +24,10 @@ EXPORT_API(Tensor)   THSNN_ParticleWGANDiscriminator_forward(const NNModule modu
 EXPORT_API(void)     THSNN_ParticleWGANDiscriminator_clipweights(const NNModule module, const double clip);
 EXPORT_API(Tensor)   THSNN_ParticleWGANDiscriminator_penalizegradient(const NNModule module, const Tensor real, const Tensor fake, const float lambda);
 
+EXPORT_API(NNModule) THSNN_AtomProjector_ctor(int nAtoms, int sizeX, int sizeY, int sizeZ, NNAnyModule* outAsAnyModule);
+EXPORT_API(Tensor)   THSNN_AtomProjector_ProjectToPlane(const NNModule module, const Tensor positions, const Tensor orientations);
+EXPORT_API(Tensor)   THSNN_AtomProjector_RasterToCartesian(const NNModule module, const Tensor positions);
+
 EXPORT_API(NNModule) THSNN_DistanceNet_ctor(NNAnyModule* outAsAnyModule);
 EXPORT_API(Tensor)   THSNN_DistanceNet_forward(const NNModule module, const Tensor reference, const Tensor data, void* d_reference, void* d_data);
 

@@ -66,6 +66,9 @@
     <ClCompile Include="LibTorchSharp\Pseudoatom_Operators.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="LibTorchSharp\AtomProjector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LibTorchSharp\cifar10.h">

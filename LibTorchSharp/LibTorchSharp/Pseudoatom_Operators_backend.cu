@@ -997,7 +997,7 @@ namespace at {
             }
             
             // No shape checking needed here. See # NOTE [ atoms_to_grid Native Functions ].
-            Tensor atoms_to_grid_3d_cuda(const Tensor& input, const Tensor& grid, int64_t z, int64_t y, int64_t x) {
+            Tensor atoms_to_grid_3d_cuda(const Tensor& input, const Tensor& grid, int64_t x, int64_t y, int64_t z) {
                 auto N = grid.size(0);
                 auto W = grid.size(1);
                 auto output = at::zeros({ N, z, y, x }, input.options());
@@ -1112,7 +1112,7 @@ namespace at {
                 return output;
             }
 
-            Tensor projectAtoms(const Tensor& intensities, const Tensor& positions, const Tensor& orientation, int64_t z, int64_t y, int64_t x) {
+            Tensor projectAtoms(const Tensor& intensities, const Tensor& positions, const Tensor& orientation, int64_t x, int64_t y, int64_t z) {
                 auto N = positions.size(0);
                 auto W = positions.size(1);
 
@@ -1154,7 +1154,7 @@ namespace at {
             }
             
             std::tuple<Tensor, Tensor, Tensor>
-                projectAtoms_backward_cuda(const Tensor& graoutput, const Tensor& intensities, const Tensor& positions, const Tensor& orientation, int64_t z, int64_t y, int64_t x) {
+                projectAtoms_backward_cuda(const Tensor& graoutput, const Tensor& intensities, const Tensor& positions, const Tensor& orientation, int64_t x, int64_t y, int64_t z) {
                 auto N = positions.size(0);
                 auto W = positions.size(1);
                 int64_t count = N * W;
