@@ -518,93 +518,64 @@ namespace at {
                     iy = atoms_to_grid_compute_source_index(iy, out_H, padding_mode, align_corners);
                     iz = atoms_to_grid_compute_source_index(iz, out_D, padding_mode, align_corners);
                     
-                    if (interpolation_mode == GridSamplerInterpolation::Bilinear) {
-                        // get corner pixel values from (x, y, z)
-                        /*index_t ix_tnw = static_cast<index_t>((ix));
-                        index_t iy_tnw = static_cast<index_t>((iy));
-                        index_t iz_tnw = static_cast<index_t>((iz));*/
-                        index_t ix_tnw = static_cast<index_t>((ix));
-                        index_t iy_tnw = static_cast<index_t>((iy));
-                        index_t iz_tnw = static_cast<index_t>((iz));
-                        index_t ix_tne = ix_tnw + 1;
-                        index_t iy_tne = iy_tnw;
-                        index_t iz_tne = iz_tnw;
+                    // get corner pixel values from (x, y, z)
+                    /*index_t ix_tnw = static_cast<index_t>((ix));
+                    index_t iy_tnw = static_cast<index_t>((iy));
+                    index_t iz_tnw = static_cast<index_t>((iz));*/
+                    index_t ix_tnw = static_cast<index_t>((ix));
+                    index_t iy_tnw = static_cast<index_t>((iy));
+                    index_t iz_tnw = static_cast<index_t>((iz));
+                    index_t ix_tne = ix_tnw + 1;
+                    index_t iy_tne = iy_tnw;
+                    index_t iz_tne = iz_tnw;
 
-                        index_t ix_tsw = ix_tnw;
-                        index_t iy_tsw = iy_tnw + 1;
-                        index_t iz_tsw = iz_tnw;
+                    index_t ix_tsw = ix_tnw;
+                    index_t iy_tsw = iy_tnw + 1;
+                    index_t iz_tsw = iz_tnw;
 
-                        index_t ix_tse = ix_tnw + 1;
-                        index_t iy_tse = iy_tnw + 1;
-                        index_t iz_tse = iz_tnw;
+                    index_t ix_tse = ix_tnw + 1;
+                    index_t iy_tse = iy_tnw + 1;
+                    index_t iz_tse = iz_tnw;
 
-                        index_t ix_bnw = ix_tnw;
-                        index_t iy_bnw = iy_tnw;
-                        index_t iz_bnw = iz_tnw + 1;
+                    index_t ix_bnw = ix_tnw;
+                    index_t iy_bnw = iy_tnw;
+                    index_t iz_bnw = iz_tnw + 1;
 
-                        index_t ix_bne = ix_tnw + 1;
-                        index_t iy_bne = iy_tnw;
-                        index_t iz_bne = iz_tnw + 1;
+                    index_t ix_bne = ix_tnw + 1;
+                    index_t iy_bne = iy_tnw;
+                    index_t iz_bne = iz_tnw + 1;
 
-                        index_t ix_bsw = ix_tnw;
-                        index_t iy_bsw = iy_tnw + 1;
-                        index_t iz_bsw = iz_tnw + 1;
+                    index_t ix_bsw = ix_tnw;
+                    index_t iy_bsw = iy_tnw + 1;
+                    index_t iz_bsw = iz_tnw + 1;
 
-                        index_t ix_bse = ix_tnw + 1;
-                        index_t iy_bse = iy_tnw + 1;
-                        index_t iz_bse = iz_tnw + 1;
+                    index_t ix_bse = ix_tnw + 1;
+                    index_t iy_bse = iy_tnw + 1;
+                    index_t iz_bse = iz_tnw + 1;
 
-                        // get surfaces to each neighbor on cartesian grid:
-                        scalar_t tnw = (ix_bse - ix) * (iy_bse - iy) * (iz_bse - iz);
-                        scalar_t tne = (ix - ix_bsw) * (iy_bsw - iy) * (iz_bsw - iz);
-                        scalar_t tsw = (ix_bne - ix) * (iy - iy_bne) * (iz_bne - iz);
-                        scalar_t tse = (ix - ix_bnw) * (iy - iy_bnw) * (iz_bnw - iz);
-                        scalar_t bnw = (ix_tse - ix) * (iy_tse - iy) * (iz - iz_tse);
-                        scalar_t bne = (ix - ix_tsw) * (iy_tsw - iy) * (iz - iz_tsw);
-                        scalar_t bsw = (ix_tne - ix) * (iy - iy_tne) * (iz - iz_tne);
-                        scalar_t bse = (ix - ix_tnw) * (iy - iy_tnw) * (iz - iz_tnw);
+                    // get surfaces to each neighbor on cartesian grid:
+                    scalar_t tnw = (ix_bse - ix) * (iy_bse - iy) * (iz_bse - iz);
+                    scalar_t tne = (ix - ix_bsw) * (iy_bsw - iy) * (iz_bsw - iz);
+                    scalar_t tsw = (ix_bne - ix) * (iy - iy_bne) * (iz_bne - iz);
+                    scalar_t tse = (ix - ix_bnw) * (iy - iy_bnw) * (iz_bnw - iz);
+                    scalar_t bnw = (ix_tse - ix) * (iy_tse - iy) * (iz - iz_tse);
+                    scalar_t bne = (ix - ix_tsw) * (iy_tsw - iy) * (iz - iz_tsw);
+                    scalar_t bsw = (ix_tne - ix) * (iy - iy_tne) * (iz - iz_tne);
+                    scalar_t bse = (ix - ix_tnw) * (iy - iy_tnw) * (iz - iz_tnw);
 
-                        //intensity value at current grid position
-                        scalar_t inp_val_NCDHW = *(input.data + n * inp_sN + w * inp_sW);
-                        scalar_t * out_ptr_NC = output.data + n * out_sN;
+                    //intensity value at current grid position
+                    scalar_t inp_val_NCDHW = *(input.data + n * inp_sN + w * inp_sW);
+                    scalar_t * out_ptr_NC = output.data + n * out_sN;
 
-                        // calculate bilinear weighted pixel value and set output pixel
-                        safe_add_3d(out_ptr_NC, iz_tnw, iy_tnw, ix_tnw, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * tnw);
-                        safe_add_3d(out_ptr_NC, iz_tnw, iy_tnw, ix_tnw, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * tne);
-                        safe_add_3d(out_ptr_NC, iz_tsw, iy_tsw, ix_tsw, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * tsw);
-                        safe_add_3d(out_ptr_NC, iz_tse, iy_tse, ix_tse, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * tse);
-                        safe_add_3d(out_ptr_NC, iz_bnw, iy_bnw, ix_bnw, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * bnw);
-                        safe_add_3d(out_ptr_NC, iz_bne, iy_bne, ix_bne, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * bne);
-                        safe_add_3d(out_ptr_NC, iz_bsw, iy_bsw, ix_bsw, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * bsw);
-                        safe_add_3d(out_ptr_NC, iz_bse, iy_bse, ix_bse, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * bse);
-
-                    }
-                    ///*
-                    //We are ignoring NN for now, as it does not really apply to us
-                    //else if (interpolation_mode == GridSamplerInterpolation::Nearest) {
-                    //    auto ix_nearest = static_cast<index_t>(::round(ix));
-                    //    auto iy_nearest = static_cast<index_t>(::round(iy));
-                    //    auto iz_nearest = static_cast<index_t>(::round(iz));
-
-                    //    // assign nearest neighor pixel value to output pixel
-                    //    scalar_t* inp_ptr_NCDHW = input.data + n * inp_sN + d * inp_sD + h * inp_sH + w * inp_sW;
-                    //    scalar_t* gInp_ptr_NC = grainput.data + n * gInp_sN;
-                    //    for (index_t c = 0; c < C; ++c, inp_ptr_NCDHW += inp_sC, gInp_ptr_NC += gInp_sC) {
-                    //        // calculate and set grainput
-                    //        safe_add_3d(gInp_ptr_NC, iz_nearest, iy_nearest, ix_nearest,
-                    //            gInp_sD, gInp_sH, gInp_sW, out_D, out_H, out_W, *inp_ptr_NCDHW);
-                    //    }
-
-                    //    // assuming grad_grid is contiguous
-                    //    // thus we can
-                    //    //   1. use index with gGrid_sW to directly compute gGrid_ptr_NDHW
-                    //    //   2. directly assign to gGrid_ptr_NDHW[0], gGrid_ptr_NDHW[1], gGrid_ptr_NDHW[2]
-                    //    scalar_t* gGrid_ptr_NDHW = grad_grid.data + index * gGrid_sW;
-                    //    gGrid_ptr_NDHW[0] = static_cast<scalar_t>(0);
-                    //    gGrid_ptr_NDHW[1] = static_cast<scalar_t>(0);
-                    //    gGrid_ptr_NDHW[2] = static_cast<scalar_t>(0);
-                    //}
-                    //*/
+                    // calculate bilinear weighted pixel value and set output pixel
+                    safe_add_3d(out_ptr_NC, iz_tnw, iy_tnw, ix_tnw, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * tnw);
+                    safe_add_3d(out_ptr_NC, iz_tne, iy_tne, ix_tne, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * tne);
+                    safe_add_3d(out_ptr_NC, iz_tsw, iy_tsw, ix_tsw, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * tsw);
+                    safe_add_3d(out_ptr_NC, iz_tse, iy_tse, ix_tse, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * tse);
+                    safe_add_3d(out_ptr_NC, iz_bnw, iy_bnw, ix_bnw, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * bnw);
+                    safe_add_3d(out_ptr_NC, iz_bne, iy_bne, ix_bne, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * bne);
+                    safe_add_3d(out_ptr_NC, iz_bsw, iy_bsw, ix_bsw, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * bsw);
+                    safe_add_3d(out_ptr_NC, iz_bse, iy_bse, ix_bse, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * bse);
                 }
             }
             template <typename scalar_t, typename index_t>
@@ -904,9 +875,8 @@ namespace at {
                 index_t ints_sN = intensities.strides[0];
                 index_t ints_sW = intensities.strides[1];
                 index_t orr_sN = orientation.strides[0];
-                index_t orr_sW = orientation.strides[1];
-                index_t orr_sR = orientation.strides[2];
-                index_t orr_sC = orientation.strides[3];
+                index_t orr_sR = orientation.strides[1];
+                index_t orr_sC = orientation.strides[2];
                 index_t out_sN= output.strides[0];
                 index_t out_sH = output.strides[1];
                 index_t out_sW = output.strides[2];
@@ -937,62 +907,35 @@ namespace at {
                     ix += x / 2;
                     iy += y / 2;
                     iz += z / 2;
-                    if (true){//interpolation_mode == GridSamplerInterpolation::Bilinear) {
-                        // get corner pixel values from (x, y, z)
-                        index_t ix_nw = static_cast<index_t>((ix));
-                        index_t iy_nw = static_cast<index_t>((iy));
 
-                        index_t ix_ne = ix_nw + 1;
-                        index_t iy_ne = iy_nw;
+                    // get corner pixel values from (x, y, z)
+                    index_t ix_nw = static_cast<index_t>((ix));
+                    index_t iy_nw = static_cast<index_t>((iy));
 
-                        index_t ix_sw = ix_nw;
-                        index_t iy_sw = iy_nw + 1;
+                    index_t ix_ne = ix_nw + 1;
+                    index_t iy_ne = iy_nw;
 
-                        index_t ix_se = ix_nw + 1;
-                        index_t iy_se = iy_nw + 1;
+                    index_t ix_sw = ix_nw;
+                    index_t iy_sw = iy_nw + 1;
 
-                        // get surfaces to each neighbor on cartesian grid:
-                        scalar_t nw = (ix_se - ix) * (iy_se - iy);
-                        scalar_t ne = (ix - ix_sw) * (iy_sw - iy);
-                        scalar_t sw = (ix_ne - ix) * (iy - iy_ne);
-                        scalar_t se = (ix - ix_nw) * (iy - iy_nw);
+                    index_t ix_se = ix_nw + 1;
+                    index_t iy_se = iy_nw + 1;
 
-                        //intensity value at current grid position
-                        scalar_t ints_val_NCHW = *(intensities.data + n * ints_sN + w * ints_sW);
-                        scalar_t* out_ptr_NC = output.data + n * out_sN;
+                    // get surfaces to each neighbor on cartesian grid:
+                    scalar_t nw = (ix_se - ix) * (iy_se - iy);
+                    scalar_t ne = (ix - ix_sw) * (iy_sw - iy);
+                    scalar_t sw = (ix_ne - ix) * (iy - iy_ne);
+                    scalar_t se = (ix - ix_nw) * (iy - iy_nw);
 
-                        // calculate bilinear weighted pixel value and set output pixel
-                        safe_add_2d(out_ptr_NC, iy_nw, ix_nw, out_sH, out_sW, out_H, out_W, ints_val_NCHW * nw);
-                        safe_add_2d(out_ptr_NC, iy_ne, ix_ne, out_sH, out_sW, out_H, out_W, ints_val_NCHW * ne);
-                        safe_add_2d(out_ptr_NC, iy_sw, ix_sw, out_sH, out_sW, out_H, out_W, ints_val_NCHW * sw);
-                        safe_add_2d(out_ptr_NC, iy_se, ix_se, out_sH, out_sW, out_H, out_W, ints_val_NCHW * se);
-                    }
-                    ///*
-                    //We are ignoring NN for now, as it does not really apply to us
-                    //else if (interpolation_mode == GridSamplerInterpolation::Nearest) {
-                    //    auto ix_nearest = static_cast<index_t>(::round(ix));
-                    //    auto iy_nearest = static_cast<index_t>(::round(iy));
-                    //    auto iz_nearest = static_cast<index_t>(::round(iz));
+                    //intensity value at current grid position
+                    scalar_t ints_val_NCHW = *(intensities.data + n * ints_sN + w * ints_sW);
+                    scalar_t* out_ptr_NC = output.data + n * out_sN;
 
-                    //    // assign nearest neighor pixel value to output pixel
-                    //    scalar_t* inp_ptr_NCDHW = input.data + n * inp_sN + d * inp_sD + h * inp_sH + w * inp_sW;
-                    //    scalar_t* gInp_ptr_NC = grainput.data + n * gInp_sN;
-                    //    for (index_t c = 0; c < C; ++c, inp_ptr_NCDHW += inp_sC, gInp_ptr_NC += gInp_sC) {
-                    //        // calculate and set grainput
-                    //        safe_add_3d(gInp_ptr_NC, iz_nearest, iy_nearest, ix_nearest,
-                    //            gInp_sD, gInp_sH, gInp_sW, out_D, out_H, out_W, *inp_ptr_NCDHW);
-                    //    }
-
-                    //    // assuming grad_grid is contiguous
-                    //    // thus we can
-                    //    //   1. use index with gGrid_sW to directly compute gGrid_ptr_NDHW
-                    //    //   2. directly assign to gGrid_ptr_NDHW[0], gGrid_ptr_NDHW[1], gGrid_ptr_NDHW[2]
-                    //    scalar_t* gGrid_ptr_NDHW = grad_grid.data + index * gGrid_sW;
-                    //    gGrid_ptr_NDHW[0] = static_cast<scalar_t>(0);
-                    //    gGrid_ptr_NDHW[1] = static_cast<scalar_t>(0);
-                    //    gGrid_ptr_NDHW[2] = static_cast<scalar_t>(0);
-                    //}
-                    //*/
+                    // calculate bilinear weighted pixel value and set output pixel
+                    safe_add_2d(out_ptr_NC, iy_nw, ix_nw, out_sH, out_sW, out_H, out_W, ints_val_NCHW * nw);
+                    safe_add_2d(out_ptr_NC, iy_ne, ix_ne, out_sH, out_sW, out_H, out_W, ints_val_NCHW * ne);
+                    safe_add_2d(out_ptr_NC, iy_sw, ix_sw, out_sH, out_sW, out_H, out_W, ints_val_NCHW * sw);
+                    safe_add_2d(out_ptr_NC, iy_se, ix_se, out_sH, out_sW, out_H, out_W, ints_val_NCHW * se);
                 }
             }
             

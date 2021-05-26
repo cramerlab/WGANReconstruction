@@ -5,8 +5,6 @@ VisualStudioVersion = 16.0.30717.126
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GPUAcceleration", "GPUAcceleration\GPUAcceleration.vcxproj", "{7976E078-C29C-487D-B354-F9ED8A497178}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TFUtility", "TFUtility\TFUtility.vcxproj", "{E6CCC2DE-6843-483F-BC4C-631FD448DBBD}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LibTorchSharp", "LibTorchSharp\LibTorchSharp.vcxproj", "{DE0DFFEB-5F85-49D8-AD4B-208A369FD70F}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WarpControls", "WarpControls\WarpControls.csproj", "{5AA36598-9DD9-4A61-91E3-4892FB3E33B0}"
@@ -63,7 +61,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BoxNetDev", "BoxNetDev\BoxN
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CubeNetDev", "CubeNetDev\CubeNetDev.csproj", "{805A787D-F305-4F9E-8D91-8A91298ED157}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TildeDev", "TildeDev\TildeDev.csproj", "{467BD836-C691-4624-8A55-95B6EA9D1E27}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TildeDev", "TildeDev\TildeDev.csproj", "{467BD836-C691-4624-8A55-95B6EA9D1E27}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -79,12 +77,6 @@ Global
 		{7976E078-C29C-487D-B354-F9ED8A497178}.Release|Any CPU.ActiveCfg = Release|x64
 		{7976E078-C29C-487D-B354-F9ED8A497178}.Release|x64.ActiveCfg = Release|x64
 		{7976E078-C29C-487D-B354-F9ED8A497178}.Release|x64.Build.0 = Release|x64
-		{E6CCC2DE-6843-483F-BC4C-631FD448DBBD}.Debug|Any CPU.ActiveCfg = Debug|x64
-		{E6CCC2DE-6843-483F-BC4C-631FD448DBBD}.Debug|x64.ActiveCfg = Debug|x64
-		{E6CCC2DE-6843-483F-BC4C-631FD448DBBD}.Debug|x64.Build.0 = Debug|x64
-		{E6CCC2DE-6843-483F-BC4C-631FD448DBBD}.Release|Any CPU.ActiveCfg = Release|x64
-		{E6CCC2DE-6843-483F-BC4C-631FD448DBBD}.Release|x64.ActiveCfg = Release|x64
-		{E6CCC2DE-6843-483F-BC4C-631FD448DBBD}.Release|x64.Build.0 = Release|x64
 		{DE0DFFEB-5F85-49D8-AD4B-208A369FD70F}.Debug|Any CPU.ActiveCfg = Debug|x64
 		{DE0DFFEB-5F85-49D8-AD4B-208A369FD70F}.Debug|x64.ActiveCfg = Debug|x64
 		{DE0DFFEB-5F85-49D8-AD4B-208A369FD70F}.Debug|x64.Build.0 = Debug|x64

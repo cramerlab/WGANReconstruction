@@ -62,7 +62,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{7976E078-C29C-487D-B354-F9ED8A497178}</ProjectGuid>
     <RootNamespace>GPUAcceleration</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">

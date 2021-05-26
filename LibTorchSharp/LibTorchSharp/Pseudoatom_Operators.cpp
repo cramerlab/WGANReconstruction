@@ -4,12 +4,12 @@
 
 using namespace torch::autograd;
 
-TORCH_LIBRARY(myops, m) {
-	m.def("atoms_to_grid(Tensor intensities, torch::Tensor positions, int64_t x, int64_t y, int64_t z) -> torch::Tensor");
-	m.def("atoms_to_grid_backwards(Tensor grad_output, torch::Tensor input, torch::Tensor grid) -> torch::Tensor[]");
-	m.def("projectAtoms(Tensor intensities, torch::Tensor positions, torch::Tensor orientations, int64_t x, int64_t y, int64_t z) -> torch::Tensor");
-	m.def("projectAtoms_backwards(Tensor grad_output, torch::Tensor intensities, torch::Tensor positions, torch::Tensor orientations, int64_t x, int64_t y, int64_t z) -> torch::Tensor[]");
-}
+//TORCH_LIBRARY(myops, m) {
+//	m.def("atoms_to_grid(Tensor intensities, Tensor positions, int64_t x, int64_t y, int64_t z) -> Tensor");
+//	m.def("atoms_to_grid_backwards(Tensor grad_output, Tensor input, Tensor grid) -> Tensor[]");
+//	m.def("projectAtoms(Tensor intensities, Tensor positions, Tensor orientations, int64_t x, int64_t y, int64_t z) -> Tensor");
+//	m.def("projectAtoms_backwards(Tensor grad_output, Tensor intensities, Tensor positions, Tensor orientations, int64_t x, int64_t y, int64_t z) -> Tensor[]");
+//}
 
 torch::Tensor atoms_to_grid(const torch::Tensor& intensities, const torch::Tensor& positions, int64_t x, int64_t y, int64_t z) {
 	static auto op = torch::Dispatcher::singleton()
@@ -114,6 +114,13 @@ tensor_list projectAtoms_backwards_cuda(const torch::Tensor& grad_output, const 
 
 torch::Tensor projectAtoms_autograd(const torch::Tensor& intensities, const torch::Tensor& positions, const torch::Tensor& orientations, int64_t x, int64_t y, int64_t z) {
 	return ProjectAtoms::apply(intensities, positions, orientations, x, y, z);
+}
+
+TORCH_LIBRARY(myops, m) {
+	m.def("atoms_to_grid", atoms_to_grid);
+	m.def("atoms_to_grid_backwards", atoms_to_grid_backwards);
+	m.def("projectAtoms", projectAtoms);
+	m.def("projectAtoms_backwards", projectAtoms_backwards);
 }
 
 TORCH_LIBRARY_IMPL(myops, CUDA, m) {

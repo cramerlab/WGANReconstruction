@@ -63,7 +63,7 @@ namespace Warp
             {
                 int DeviceID = Devices[i];
 
-                UNetModel[i] = UNet2D(1, 1, 1, 1, false, false);
+                UNetModel[i] = UNet2D(1, 1, 1, 1, 1, false, false);
                 UNetModel[i].ToCuda(DeviceID);
 
                 TensorSource[i] = Float32Tensor.Zeros(new long[] { DeviceBatch, 1, BoxDimensions.Y, BoxDimensions.X }, DeviceType.CUDA, DeviceID);

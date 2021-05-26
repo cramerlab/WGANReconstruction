@@ -133,6 +133,10 @@
       <Command>copy /y $(PYTORCH_LIBS)\build\bin\*.dll $(TargetDir)
 copy /y "C:\Program Files\NVIDIA Corporation\NvToolsExt\bin\x64\nvToolsExt64_1.dll" $(TargetDir)</Command>
     </PostBuildEvent>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <AdditionalOptions>-D__CUDA_NO_HALF_OPERATORS__ %(AdditionalOptions)</AdditionalOptions>
+    </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
