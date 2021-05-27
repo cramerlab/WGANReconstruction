@@ -10,24 +10,24 @@
 
 struct AtomProjectorImpl : MultiGPUModule 
 {
-	int sizeX;
-	int sizeY;
-	int sizeZ;
-	torch::Tensor intensities;
+	int _sizeX;
+	int _sizeY;
+	int _sizeZ;
+	torch::Tensor _intensities;
 
-	AtomProjectorImpl(int nAtoms, int sizeX, int sizeY, int sizeZ ): sizeX(sizeX), sizeY(sizeY), sizeZ(sizeZ) 
+	AtomProjectorImpl(const torch::Tensor& intensities, int sizeX, int sizeY, int sizeZ ): _sizeX(sizeX), _sizeY(sizeY), _sizeZ(sizeZ) 
 	{
-		intensities = register_parameter("intensities", torch::randn({ 1, nAtoms }));
+		_intensities = register_parameter("intensities", intensities);
 	}
 
 	torch::Tensor ProjectToPlane(const torch::Tensor& positions, const torch::Tensor& orientations) 
 	{
-		return projectAtoms(intensities.expand({ orientations.size(0), -1 }), positions, orientations, sizeX, sizeY, sizeZ);
+		return projectAtoms(_intensities.expand({ orientations.size(0), -1 }), positions, orientations, _sizeX, _sizeY, _sizeZ);
 	}
 
 	torch::Tensor RasterToCartesian(const torch::Tensor& positions) 
 	{
-		return atoms_to_grid(intensities.expand({ positions.size(0), -1 }), positions, sizeX, sizeY, sizeZ);
+		return atoms_to_grid(_intensities.expand({ positions.size(0), -1 }), positions, _sizeX, _sizeY, _sizeZ);
 	}
 
 	torch::Tensor forward() 
@@ -39,11 +39,11 @@ struct AtomProjectorImpl : MultiGPUModule
 
 //TORCH_MODULE(AtomProjector);
 
-NNModule THSNN_AtomProjector_ctor(int nAtoms, int sizeX, int sizeY, int sizeZ, NNAnyModule* outAsAnyModule) 
+NNModule THSNN_AtomProjector_ctor(const Tensor intensities, int sizeX, int sizeY, int sizeZ, NNAnyModule* outAsAnyModule) 
 {
 	at::globalContext().setBenchmarkCuDNN(true);
 
-	AtomProjectorImpl Projector(nAtoms, sizeX, sizeY, sizeZ);
+	AtomProjectorImpl Projector(*intensities, sizeX, sizeY, sizeZ);
 	auto mod = std::make_shared<AtomProjectorImpl>(Projector);
 
 	// Keep a boxed version of the module in case we add it to a Sequential later (the C++ templating means

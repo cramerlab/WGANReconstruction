@@ -21,7 +21,7 @@ namespace TorchSharp.NN
         [DllImport("LibTorchSharp")]
         private static extern IntPtr THSNN_AtomProjector_RasterToCartesian(Module.HType module, IntPtr positions);
 
-        public TorchTensor ProjectToPlane(TorchTensor positions)
+        public TorchTensor RasterToCartesian(TorchTensor positions)
         {
             var res = THSNN_AtomProjector_RasterToCartesian(handle, positions.Handle);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
@@ -51,11 +51,11 @@ namespace TorchSharp.NN
     public static partial class Modules
     {
         [DllImport("LibTorchSharp")]
-        private static extern IntPtr THSNN_AtomProjector_ctor(int nAtoms, int sizeX, int sizeY, int sizeZ, out IntPtr outAsAnyModule);
+        private static extern IntPtr THSNN_AtomProjector_ctor(IntPtr intensities, int sizeX, int sizeY, int sizeZ, out IntPtr outAsAnyModule);
 
-        static public AtomProjector AtomProjector(int nAtoms, int sizeX, int sizeY, int sizeZ)
+        static public AtomProjector AtomProjector(TorchTensor intensities, int sizeX, int sizeY, int sizeZ)
         {
-            var res = THSNN_AtomProjector_ctor(nAtoms, sizeX, sizeY, sizeZ, out var boxedHandle);
+            var res = THSNN_AtomProjector_ctor(intensities.Handle, sizeX, sizeY, sizeZ, out var boxedHandle);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new AtomProjector(res, boxedHandle);
         }

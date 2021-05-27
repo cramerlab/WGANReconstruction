@@ -722,9 +722,8 @@ namespace at {
                 index_t ints_sN = intensities.strides[0];
                 index_t ints_sW = intensities.strides[1];
                 index_t orr_sN = orientation.strides[0];
-                index_t orr_sW = orientation.strides[1];
-                index_t orr_sR = orientation.strides[2];
-                index_t orr_sC = orientation.strides[3];
+                index_t orr_sR = orientation.strides[1];
+                index_t orr_sC = orientation.strides[2];
                 index_t pos_sN = positions.strides[0];
                 index_t pos_sW = positions.strides[1];
                 index_t pos_sCoor = positions.strides[2];
