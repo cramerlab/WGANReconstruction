@@ -41,7 +41,7 @@ struct MLPBlock : MultiGPUModule
         torch::Tensor result = fc->forward(x);
 
         if (_useactivation)
-            result = torch::leaky_relu(result, 0.2);
+            result = torch::leaky_relu(result, 0.0);
 
         if (_features_in == _features_out && _residual)
             result += x;
@@ -57,7 +57,13 @@ struct MLPImpl : MultiGPUModule
     MLPImpl(std::vector<int64_t> block_widths, bool residual)
     {
         for (int i = 0; i < block_widths.size() - 1; i++)
+        {
             blocks->push_back(MLPBlock(block_widths[i], block_widths[i + 1], residual, i < block_widths.size() - 2));
+            //if (i < block_widths.size() - 2)
+            //    blocks->push_back(torch::nn::Dropout(torch::nn::DropoutOptions(0.001)));
+        }
+
+        register_module("stack", blocks);
     }
 
     torch::Tensor forward(torch::Tensor input)

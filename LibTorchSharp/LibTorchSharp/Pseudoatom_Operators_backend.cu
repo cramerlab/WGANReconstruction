@@ -1058,7 +1058,7 @@ namespace at {
                 auto N = positions.size(0);
                 auto W = positions.size(1);
 
-                auto output = at::zeros({ N, y, x}, positions.options());
+                auto output = at::zeros({ N, /*16, */y, x}, positions.options());
                 int64_t count = N*W;
                 bool align_corners = true;
                 if (count > 0) {
@@ -1070,7 +1070,7 @@ namespace at {
                             //projectAtoms_kernel<scalar_t>
                             //    << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                             projectAtoms_kernel<scalar_t>
-                                << <1, 1, 0, at::cuda::getCurrentCUDAStream() >> > (
+                                << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                                     static_cast<int>(count),
                                     getTensorInfo<scalar_t, int>(positions),
                                     getTensorInfo<scalar_t, int>(intensities),
@@ -1082,7 +1082,7 @@ namespace at {
                           //  projectAtoms_kernel<scalar_t>
                            //     << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                             projectAtoms_kernel<scalar_t>
-                                << <1, 1, 0, at::cuda::getCurrentCUDAStream() >> > (
+                                << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                                     count,
                                     getTensorInfo<scalar_t, int64_t>(positions),
                                     getTensorInfo<scalar_t, int64_t>(intensities),
@@ -1092,7 +1092,7 @@ namespace at {
                         }
                         });
                 }
-                return output;
+                return output;// .sum(1, false);
             }
             
             std::tuple<Tensor, Tensor, Tensor>
@@ -1113,7 +1113,7 @@ namespace at {
                             //projectAtoms_backwards_kernel<scalar_t>
                             //    << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                             projectAtoms_backwards_kernel<scalar_t>
-                                << <1, 1, 0, at::cuda::getCurrentCUDAStream() >> > (
+                                << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                                     static_cast<int>(count),
                                     getTensorInfo<scalar_t, int>(positions),
                                     getTensorInfo<scalar_t, int>(intensities),
