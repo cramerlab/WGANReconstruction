@@ -2,7 +2,7 @@
 #include <cuda_runtime.h>
 //#include <torch/torch.h>
 //#include <ATen/ATen.h>
-#include "Pseudoatom_Operators_backend.cuh"
+#include "CustomOperatorsBackend.cuh"
 
 #include <ATen/native/cuda/UpSample.cuh>
 #include <ATen/cuda/CUDAContext.h>
@@ -619,87 +619,7 @@ namespace at {
                 //printf("%f %f %f\n %f %f %f", x, y, z, *rX, *rY, *rZ);
             }
             
-            template <typename scalar_t, typename index_t>
-            __global__ void FFTCropKernel(TensorInfo<scalar_t, index_t> input, TensorInfo<scalar_t, index_t> output)
-            {
-                index_t inp_N = input.sizes[0];
-                index_t inp_D = input.sizes[1];
-                index_t inp_H = input.sizes[2];
-                index_t inp_W = input.sizes[3];
-
-                index_t out_N = output.sizes[0];
-                index_t out_D = output.sizes[1];
-                index_t out_H = output.sizes[2];
-                index_t out_W = output.sizes[3];
-
-                index_t inp_sN = input.strides[0];
-                index_t inp_sD = input.strides[1];
-                index_t inp_sH = input.strides[2];
-                index_t inp_sW = input.strides[3];
-
-                index_t out_sN = output.strides[0];
-                index_t out_sD = output.strides[1];
-                index_t out_sH = output.strides[2];
-                index_t out_sW = output.strides[3];
-
-                index_t n = blockIdx.z;
-
-                auto p_inp_N = input.data + inp_sN * n;
-                auto p_out_N = output.data + out_sN * n;
-
-
-                for (int x = threadIdx.x; x < out_W; x += blockDim.x)
-                {
-                    int y = blockIdx.x;
-                    int yy = y < out_H / 2 + 1 ? y : y - out_H + inp_H;
-                    int z = blockIdx.y;
-                    int zz = z < out_D / 2 + 1 ? z : z - out_D + inp_D;
-
-                    //yy = tmax(0, tmin(yy, olddims.y - 1));
-                    //zz = tmax(0, tmin(zz, olddims.z - 1));
-
-                    *(p_out_N + z * out_sD + y * out_sH + x*out_sW) = *(p_inp_N + zz * inp_sD + yy * inp_sH  + x * inp_sW);
-                }
-            }
             
-            template <typename scalar_t, typename index_t>
-            __global__ void FFTCropKernel_backwards(TensorInfo<scalar_t, index_t> grad_input, TensorInfo<scalar_t, index_t> grad_output)
-            {
-                index_t inp_N = grad_input.sizes[0];
-                index_t inp_D = grad_input.sizes[1];
-                index_t inp_H = grad_input.sizes[2];
-                index_t inp_W = grad_input.sizes[3];
-
-                index_t out_N = grad_output.sizes[0];
-                index_t out_D = grad_output.sizes[1];
-                index_t out_H = grad_output.sizes[2];
-                index_t out_W = grad_output.sizes[3];
-
-                index_t inp_sN = grad_input.strides[0];
-                index_t inp_sD = grad_input.strides[1];
-                index_t inp_sH = grad_input.strides[2];
-                index_t inp_sW = grad_input.strides[3];
-
-                index_t out_sN = grad_output.strides[0];
-                index_t out_sD = grad_output.strides[1];
-                index_t out_sH = grad_output.strides[2];
-                index_t out_sW = grad_output.strides[3];
-
-                index_t n = blockIdx.z;
-
-                auto p_gInp_N= grad_input.data + inp_sN * n;
-                auto p_gOut_N= grad_output.data + out_sN * n;
-
-                for (int x = threadIdx.x; x < out_W; x += blockDim.x)
-                {
-                    int y = blockIdx.x;
-                    int yy = y < out_H / 2 + 1 ? y : y - out_H + inp_H;
-                    int z = blockIdx.y;
-                    int zz = z < out_D / 2 + 1 ? z : z - out_D + inp_D;
-
-                    *(p_gInp_N + zz * inp_sD + yy * inp_sH + x * inp_sW) = *(p_gOut_N + z * out_sD + y * out_sH + x * out_sW);
-                }
-            }
 
             template <typename scalar_t, typename index_t>
             __global__ void projectAtoms_backwards_kernel(
@@ -1032,33 +952,14 @@ namespace at {
                 return std::make_tuple(grad_intensities, grad_positions);
             }
 
-            Tensor fft_crop(const Tensor& fft_volume, int3 newDims) {
-#define NextMultipleOf(value, base) (((value) + (base) - 1) / (base) * (base))
-                //size_t elementsnew = ElementsFFT(newDims);
-                //size_t elementsold = ElementsFFT(olddims);
-                Tensor output = torch::empty({ fft_volume.size(0), newDims.z, newDims.y, newDims.x / 2 + 1 }, fft_volume.options());
-
-                int TpB = std::min(256, NextMultipleOf(newDims.x / 2 + 1, 32));
-                dim3 grid = dim3(newDims.y, newDims.z, fft_volume.size(0));
-                AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES(fft_volume.scalar_type(), "fft_crop", [&] {
-
-                    FFTCropKernel << <grid, TpB >> > (getTensorInfo<scalar_t, int>(fft_volume), getTensorInfo<scalar_t, int>(output));
-                    /*if (canUse32BitIndexMath(fft_volume))
-                    {
-                        
-                    }
-                    else {
-                        FFTCropKernel << <grid, TpB >> > (getTensorInfo<scalar_t, int64_t>(fft_volume), output);
-                    }*/
-                });
-                return output;
-            }
+            
 
             Tensor projectAtoms(const Tensor& intensities, const Tensor& positions, const Tensor& orientation, int64_t x, int64_t y, int64_t z) {
                 auto N = positions.size(0);
                 auto W = positions.size(1);
 
-                auto output = at::zeros({ N, /*16, */y, x}, positions.options());
+                auto output = at::zeros({ N, y, x}, positions.options());
+
                 int64_t count = N*W;
                 bool align_corners = true;
                 if (count > 0) {
@@ -1067,8 +968,6 @@ namespace at {
                         if (canUse32BitIndexMath(positions) &&
                             canUse32BitIndexMath(intensities) && canUse32BitIndexMath(orientation) &&
                             canUse32BitIndexMath(output)) {
-                            //projectAtoms_kernel<scalar_t>
-                            //    << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                             projectAtoms_kernel<scalar_t>
                                 << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                                     static_cast<int>(count),
@@ -1079,8 +978,6 @@ namespace at {
                             AT_CUDA_CHECK(cudaGetLastError());
                         }
                         else {
-                          //  projectAtoms_kernel<scalar_t>
-                           //     << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                             projectAtoms_kernel<scalar_t>
                                 << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                                     count,
@@ -1110,8 +1007,6 @@ namespace at {
                         if (canUse32BitIndexMath(positions) &&
                             canUse32BitIndexMath(intensities) && canUse32BitIndexMath(orientation) &&
                             canUse32BitIndexMath(graoutput)) {
-                            //projectAtoms_backwards_kernel<scalar_t>
-                            //    << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                             projectAtoms_backwards_kernel<scalar_t>
                                 << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                                     static_cast<int>(count),
@@ -1124,8 +1019,7 @@ namespace at {
                             AT_CUDA_CHECK(cudaGetLastError());
                         }
                         else {
-                           // projectAtoms_backwards_kernel<scalar_t>
-                           //     << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
+
                             projectAtoms_backwards_kernel<scalar_t>
                                 << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                                     count,
@@ -1142,29 +1036,7 @@ namespace at {
                 return std::make_tuple(grad_intensities, grad_positions, grad_orientation);
             
             }
-            /*
-            Tensor d_FFTCrop(const Tensor &input, int3 newdims)
-            {
-                size_t elementsnew = ElementsFFT(newdims);
-                size_t elementsold = ElementsFFT(olddims);
 
-                T* d_intermediate;
-                if (input == output)
-                    cudaMalloc((void**)&d_intermediate, ElementsFFT(newdims) * batch * sizeof(T));
-                else
-                    d_intermediate = output;
-
-                int TpB = min(256, NextMultipleOf(newdims.x / 2 + 1, 32));
-                dim3 grid = dim3(newdims.y, newdims.z, batch);
-                FFTCropKernel << <grid, TpB >> > (input, d_intermediate, olddims, newdims);
-
-                if (input == output)
-                {
-                    cudaMemcpy(output, d_intermediate, ElementsFFT(newdims) * batch * sizeof(T), cudaMemcpyDeviceToDevice);
-                    cudaFree(d_intermediate);
-                }
-            }
-            */
         }  // namespace
     }
 }

@@ -338,6 +338,8 @@ EXPORT_API(Tensor) THSTensor_gt_scalar(const Tensor left, const Scalar right);
 
 EXPORT_API(Tensor) THSTensor_gt_scalar_(const Tensor left, const Scalar right);
 
+EXPORT_API(Tensor) THSTensor_imag(const Tensor tensor);
+
 EXPORT_API(Tensor) THSTensor_indices(Tensor tensor);
 
 EXPORT_API(Tensor) THSTensor_index_select(Tensor tensor, int64_t dim, Tensor index);
@@ -587,6 +589,8 @@ EXPORT_API(Tensor) THSTensor_randn_out(const int64_t* sizes, const int length, c
 EXPORT_API(Tensor) THSTensor_randperm(const int64_t n, const int8_t scalar_type, const int device_type, const int device_index, const bool requires_grad);
 
 EXPORT_API(Tensor) THSTensor_randperm_out(const int64_t n, const Tensor out);
+
+EXPORT_API(Tensor) THSTensor_real(const Tensor tensor);
 
 EXPORT_API(Tensor) THSTensor_relu(const Tensor tensor);
 

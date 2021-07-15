@@ -1345,6 +1345,28 @@ namespace TorchSharp.Tensor
         }
 
         [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSTensor_imag(IntPtr tensor);
+
+        public TorchTensor Imag()
+        {
+            var res = THSTensor_imag(handle);
+            if (res == IntPtr.Zero)
+                Torch.CheckForErrors();
+            return new TorchTensor(res);
+        }
+
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSTensor_real(IntPtr tensor);
+
+        public TorchTensor Real()
+        {
+            var res = THSTensor_real(handle);
+            if (res == IntPtr.Zero)
+                Torch.CheckForErrors();
+            return new TorchTensor(res);
+        }
+
+        [DllImport("LibTorchSharp")]
         private static extern IntPtr THSTensor_relu(IntPtr tensor);
 
         public TorchTensor Relu()

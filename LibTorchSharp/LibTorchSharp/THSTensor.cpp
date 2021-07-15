@@ -862,6 +862,12 @@ Tensor THSTensor_gt_scalar_(const Tensor left, const Scalar right)
     CATCH_TENSOR(left->gt_(*right));
 }
 
+Tensor THSTensor_imag(const Tensor tensor)
+{
+    AT_ASSERT(tensor->is_complex());
+    CATCH_TENSOR(at::imag(*tensor));
+}
+
 Tensor THSTensor_index_select(Tensor tensor, int64_t dim, Tensor index)
 {
     CATCH_TENSOR(tensor->index_select(dim, *index));
@@ -1639,6 +1645,11 @@ Tensor THSTensor_randperm(const int64_t n,
 Tensor THSTensor_randperm_out(const int64_t n, const Tensor out)
 {
     CATCH_TENSOR(torch::randperm_out(*out, n));
+}
+
+Tensor THSTensor_real(const Tensor tensor) {
+
+    CATCH_TENSOR(at::real(*tensor));
 }
 
 Tensor THSTensor_relu(const Tensor tensor)

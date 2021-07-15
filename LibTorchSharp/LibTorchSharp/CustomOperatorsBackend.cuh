@@ -31,7 +31,9 @@ namespace at {
             std::tuple<Tensor, Tensor, Tensor>
                 projectAtoms_backward_cuda(const Tensor& grad_output, const Tensor& intensities, const Tensor& positions, const Tensor& orientation, int64_t x, int64_t y, int64_t z);
 
-            Tensor fft_crop(const Tensor& fft_volume, int3 newDims);
+            Tensor fft_crop_cuda(const Tensor& fft_volume, int64_t newDims_x, int64_t newDims_y, int64_t newDims_z);
+            
+            Tensor fft_crop_backwards_cuda(const torch::Tensor& grad_output, int64_t oldDims_x, int64_t oldDims_y, int64_t oldDims_z);
         }
     }
 }

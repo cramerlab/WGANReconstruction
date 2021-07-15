@@ -63,10 +63,13 @@
     <ClCompile Include="LibTorchSharp\MLP.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="LibTorchSharp\Pseudoatom_Operators.cpp">
+    <ClCompile Include="LibTorchSharp\CustomOperatorsAutograd.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="LibTorchSharp\AtomProjector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="LibTorchSharp\FFTCrop.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -110,15 +113,18 @@
     <ClInclude Include="LibTorchSharp\MultiGPUModule.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="LibTorchSharp\Pseudoatom_Operators.h">
+    <ClInclude Include="LibTorchSharp\CustomOperatorsAutograd.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="LibTorchSharp\Pseudoatom_Operators_backend.cuh">
+    <ClInclude Include="LibTorchSharp\CustomOperatorsBackend.cuh">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="LibTorchSharp\Pseudoatom_Operators_backend.cu">
+    <CudaCompile Include="LibTorchSharp\CustomOperatorsBackend.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
+    <CudaCompile Include="LibTorchSharp\FFTCropBackend.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
   </ItemGroup>

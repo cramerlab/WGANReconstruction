@@ -40,3 +40,5 @@ EXPORT_API(bool) THSTorch_scalar_to_bool(Scalar value);
 
 // Dispose the scalar.
 EXPORT_API(void) THSTorch_dispose_scalar(Scalar scalar);
+
+
