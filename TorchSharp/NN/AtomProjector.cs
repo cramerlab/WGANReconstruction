@@ -9,11 +9,11 @@ namespace TorchSharp.NN
         internal AtomProjector(IntPtr handle, IntPtr boxedHandle) : base(handle, boxedHandle) { }
 
         [DllImport("LibTorchSharp")]
-        private static extern IntPtr THSNN_AtomProjector_ProjectToPlane(Module.HType module, IntPtr positions, IntPtr orientations);
+        private static extern IntPtr THSNN_AtomProjector_ProjectToPlane(Module.HType module, IntPtr positions, IntPtr orientations, IntPtr shift);
 
-        public TorchTensor ProjectToPlane(TorchTensor positions, TorchTensor orientations)
+        public TorchTensor ProjectToPlane(TorchTensor positions, TorchTensor orientations, TorchTensor shift)
         {
-            var res = THSNN_AtomProjector_ProjectToPlane(handle, positions.Handle, orientations.Handle);
+            var res = THSNN_AtomProjector_ProjectToPlane(handle, positions.Handle, orientations.Handle, shift.Handle);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }
@@ -29,11 +29,11 @@ namespace TorchSharp.NN
         }
 
         [DllImport("LibTorchSharp")]
-        private static extern IntPtr THSNN_ProjectAtomsToPlane(IntPtr intensities, IntPtr positions, IntPtr orientations, long sizeX, long sizeY, long sizeZ);
+        private static extern IntPtr THSNN_ProjectAtomsToPlane(IntPtr intensities, IntPtr positions, IntPtr orientations, IntPtr shift, long sizeX, long sizeY, long sizeZ);
 
-        public static TorchTensor ProjectAtomsToPlane(TorchTensor intensities, TorchTensor positions, TorchTensor orientations, int sizeX, int sizeY, int sizeZ)
+        public static TorchTensor ProjectAtomsToPlane(TorchTensor intensities, TorchTensor positions, TorchTensor orientations, TorchTensor shift, int sizeX, int sizeY, int sizeZ)
         {
-            var res = THSNN_ProjectAtomsToPlane(intensities.Handle, positions.Handle, orientations.Handle, sizeX, sizeY, sizeZ);
+            var res = THSNN_ProjectAtomsToPlane(intensities.Handle, positions.Handle, orientations.Handle, shift.Handle, sizeX, sizeY, sizeZ);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }

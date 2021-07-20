@@ -20,9 +20,9 @@ struct AtomProjectorImpl : MultiGPUModule
 		_intensities = register_parameter("intensities", intensities);
 	}
 
-	torch::Tensor ProjectToPlane(const torch::Tensor& positions, const torch::Tensor& orientations) 
+	torch::Tensor ProjectToPlane(const torch::Tensor& positions, const torch::Tensor& orientations, const torch::Tensor& shift)
 	{
-		return projectAtoms(_intensities.expand({ orientations.size(0), -1 }), positions, orientations, _sizeX, _sizeY, _sizeZ);
+		return projectAtoms(_intensities.expand({ orientations.size(0), -1 }), positions, orientations, shift, _sizeX, _sizeY, _sizeZ);
 	}
 
 	torch::Tensor RasterToCartesian(const torch::Tensor& positions) 
@@ -58,9 +58,9 @@ NNModule THSNN_AtomProjector_ctor(const Tensor intensities, int sizeX, int sizeY
 	return res;
 }
 
-Tensor THSNN_AtomProjector_ProjectToPlane(const NNModule module, const Tensor positions, const Tensor orientations)
+Tensor THSNN_AtomProjector_ProjectToPlane(const NNModule module, const Tensor positions, const Tensor orientations, const Tensor shift)
 {
-	CATCH_TENSOR((*module)->as<AtomProjectorImpl>()->ProjectToPlane(*positions, *orientations));
+	CATCH_TENSOR((*module)->as<AtomProjectorImpl>()->ProjectToPlane(*positions, *orientations, *shift));
 }
 
 Tensor THSNN_AtomProjector_RasterToCartesian(const NNModule module, const Tensor positions)
@@ -68,9 +68,9 @@ Tensor THSNN_AtomProjector_RasterToCartesian(const NNModule module, const Tensor
 	CATCH_TENSOR((*module)->as<AtomProjectorImpl>()->RasterToCartesian(*positions));
 }
 
-Tensor THSNN_ProjectAtomsToPlane(const Tensor intensities, const Tensor positions, const Tensor orientations, const int64_t sizeX, const int64_t sizeY, const int64_t sizeZ)
+Tensor THSNN_ProjectAtomsToPlane(const Tensor intensities, const Tensor positions, const Tensor orientations, const Tensor shift, const int64_t sizeX, const int64_t sizeY, const int64_t sizeZ)
 {
-	CATCH_TENSOR(projectAtoms(intensities->expand({ orientations->size(0), -1 }), *positions, *orientations, sizeX, sizeY, sizeZ));
+	CATCH_TENSOR(projectAtoms(intensities->expand({ orientations->size(0), -1 }), *positions, *orientations, *shift, sizeX, sizeY, sizeZ));
 }
 
 Tensor THSNN_RasterAtomsToCartesian(const Tensor intensities, const Tensor positions, const int64_t sizeX, const int64_t sizeY, const int64_t sizeZ)

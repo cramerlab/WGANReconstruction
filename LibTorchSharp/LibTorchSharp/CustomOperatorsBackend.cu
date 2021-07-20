@@ -283,8 +283,7 @@ namespace at {
                     gpuAtomicAdd(data + d * sD + h * sH + w * sW, delta);
                 }
             }
-
-
+            
             template <typename scalar_t, typename index_t>
             static __forceinline__ __device__ scalar_t unsafe_access(scalar_t* data, index_t d, index_t h, index_t w, index_t sD, index_t sH, index_t sW) {
                 return *(data + d * sD + h * sH + w * sW);
@@ -580,43 +579,35 @@ namespace at {
             }
             template <typename scalar_t, typename index_t>
             static  __forceinline__ __device__ void matMult(scalar_t* mat, index_t sC, index_t sR, scalar_t x, scalar_t y, scalar_t z, scalar_t *rX, scalar_t* rY, scalar_t* rZ) {
-                auto valA = (*mat);
-                auto valB = (*(mat + sC));
-                auto valC = (*(mat + 2 * sC));
                 *(rX) = x * (*mat) + y * (*(mat + sC)) + z * (*(mat + 2 * sC));
                 mat += sR;
-                auto valD = (*mat);
-                auto valE = (*(mat + sC));
-                auto valF = (*(mat + 2 * sC));
                 *(rY) = x * (*mat) + y * (*(mat + sC)) + z * (*(mat + 2 * sC));
                 mat += sR;
-                auto valG = (*mat);
-                auto valH = (*(mat + sC));
-                auto valI = (*(mat + 2 * sC));
                 *(rZ) = x * (*mat) + y * (*(mat + sC)) + z * (*(mat + 2 * sC));
-                //printf("%f %f %f \n %f %f %f \n %f %f %f \n", valA, valB, valC, valD, valE, valF, valG, valH, valI);
-                //printf("%f %f %f\n %f %f %f", x, y, z, *rX, *rY, *rZ);
+            }
 
+            template <typename scalar_t, typename index_t>
+            static  __forceinline__ __device__ void safe_matGrad(scalar_t* grad_mat, index_t sC, index_t sR, scalar_t x, scalar_t y, scalar_t z, scalar_t gx, scalar_t gy, scalar_t gz) {
+                gpuAtomicAdd(grad_mat, x * gx);
+                gpuAtomicAdd(grad_mat + sC, y * gx);
+                gpuAtomicAdd(grad_mat + 2 * sC, z * gx);
+                grad_mat += sR;
+                gpuAtomicAdd(grad_mat, x * gy);
+                gpuAtomicAdd(grad_mat + sC, y * gy);
+                gpuAtomicAdd(grad_mat + 2 * sC, z * gy);
+                grad_mat += sR;
+                gpuAtomicAdd(grad_mat, x * gz);
+                gpuAtomicAdd(grad_mat + sC, y * gz);
+                gpuAtomicAdd(grad_mat + 2 * sC, z * gz);
             }
 
             template <typename scalar_t, typename index_t>
             static  __forceinline__ __device__ void matMultT(scalar_t* mat, index_t sC, index_t sR, scalar_t x, scalar_t y, scalar_t z, scalar_t* rX, scalar_t* rY, scalar_t* rZ) {
-                auto valA = (*mat);
-                auto valB = (*(mat + sR));
-                auto valC = (*(mat + 2 * sR));
                 *(rX) = x * (*mat) + y * (*(mat + sR)) + z * (*(mat + 2 * sR));
                 mat += sC;
-                auto valD = (*mat);
-                auto valE = (*(mat + sR));
-                auto valF = (*(mat + 2 * sR));
                 *(rY) = x * (*mat) + y * (*(mat + sR)) + z * (*(mat + 2 * sR));
                 mat += sC;
                 *(rZ) = x * (*mat) + y * (*(mat + sR)) + z * (*(mat + 2 * sR));
-                auto valG = (*mat);
-                auto valH = (*(mat + sR));
-                auto valI = (*(mat + 2 * sR));
-                //printf("%f %f %f \n %f %f %f \n %f %f %f \n", valA, valB, valC, valD, valE, valF, valG, valH, valI);
-                //printf("%f %f %f\n %f %f %f", x, y, z, *rX, *rY, *rZ);
             }
             
             
@@ -627,17 +618,19 @@ namespace at {
                 TensorInfo<scalar_t, index_t> positions,
                 TensorInfo<scalar_t, index_t> intensities,
                 TensorInfo<scalar_t, index_t> orientation,
-                TensorInfo<scalar_t, index_t> graoutput,
+                TensorInfo<scalar_t, index_t> shift,
+                TensorInfo<scalar_t, index_t> grad_output,
                 TensorInfo<scalar_t, index_t> grad_positions,
                 TensorInfo<scalar_t, index_t> grad_intensities,
+                TensorInfo<scalar_t, index_t> grad_orientations,
                 int64_t x, int64_t y, int64_t z)
             {
 
 
                 index_t pos_N = positions.sizes[0];
                 index_t pos_W = positions.sizes[1];
-                index_t gOut_H = graoutput.sizes[1];
-                index_t gOut_W = graoutput.sizes[2];
+                index_t gOut_H = grad_output.sizes[1];
+                index_t gOut_W = grad_output.sizes[2];
 
                 index_t ints_sN = intensities.strides[0];
                 index_t ints_sW = intensities.strides[1];
@@ -647,10 +640,12 @@ namespace at {
                 index_t pos_sN = positions.strides[0];
                 index_t pos_sW = positions.strides[1];
                 index_t pos_sCoor = positions.strides[2];
+                index_t shift_sN = shift.strides[0];
+                index_t shift_sCoor = shift.strides[1];
 
-                index_t gOut_sN = graoutput.strides[0];
-                index_t gOut_sH = graoutput.strides[1];
-                index_t gOut_sW = graoutput.strides[2];
+                index_t gOut_sN = grad_output.strides[0];
+                index_t gOut_sH = grad_output.strides[1];
+                index_t gOut_sW = grad_output.strides[2];
                 index_t gInts_sN = grad_intensities.strides[0];
                 index_t gInts_sW = grad_intensities.strides[1];
                 index_t gPos_sN = grad_positions.strides[0];
@@ -663,13 +658,15 @@ namespace at {
                     const index_t w = index % pos_W;
                     const index_t n = index / (pos_W);
                     const auto pos_offset = n * pos_sN + w * pos_sW;
-
                     // get the corresponding output x, y, z co-ordinates from grid
                     // 1st the coordinates saved in grid, i.e. in [-1, 1]
-                    scalar_t ix = positions.data[pos_offset];
-                    scalar_t iy = positions.data[pos_offset + pos_sCoor];
-                    scalar_t iz = positions.data[pos_offset + 2 * pos_sCoor];
-
+                    scalar_t ix = positions.data[pos_offset] + shift.data[n * shift_sN];
+                    scalar_t iy = positions.data[pos_offset + pos_sCoor] + shift.data[n * shift_sN + shift_sCoor];
+                    scalar_t iz = positions.data[pos_offset + 2 * pos_sCoor] + shift.data[n * shift_sN + 2 * shift_sCoor];
+                    scalar_t ox, oy, oz;
+                    ox = ix;
+                    oy = iy;
+                    oz = iz;
                     //rotate coordinates
                     scalar_t tIx = ix;
                     scalar_t tIy = iy;
@@ -681,6 +678,7 @@ namespace at {
                     ix = atoms_to_grid_compute_source_index_set_grad(ix, x, GridSamplerPadding::Zeros, true, &gix_mult);
                     iy = atoms_to_grid_compute_source_index_set_grad(iy, y, GridSamplerPadding::Zeros, true, &giy_mult);
                     iz = atoms_to_grid_compute_source_index_set_grad(iz, z, GridSamplerPadding::Zeros, true, &giz_mult);
+
 
                     if (!within_bounds_2d(ix, iy, x, y)) {
                         continue;
@@ -709,7 +707,7 @@ namespace at {
                         scalar_t gix = static_cast<scalar_t>(0), giy = static_cast<scalar_t>(0), giz = static_cast<scalar_t>(0), gi = static_cast<scalar_t>(0);
                         auto gInp_ptr_NCDHW = grad_intensities.data + n * gInts_sN + w * gInts_sW;
                         auto ints_val_NCDHW = *(intensities.data + n * ints_sN + w * ints_sW);
-                        auto gOut_ptr_NC = graoutput.data + n * gOut_sN;
+                        auto gOut_ptr_NC = grad_output.data + n * gOut_sN;
                         // calculate grad_grid
                         if (within_bounds_2d(iy_nw, ix_nw, gOut_H, gOut_W)) {
                             auto gOut = unsafe_access(gOut_ptr_NC, iy_nw, ix_nw, gOut_sH, gOut_sW);
@@ -737,41 +735,17 @@ namespace at {
                         }
                        
                         *(gInp_ptr_NCDHW) = gi;
-                        tIx = gix;
-                        tIy = giy;
-                        tIz = giz;
+                        tIx = gix * gix_mult;
+                        tIy = giy * giy_mult;
+                        tIz = giz * giz_mult;
+                        safe_matGrad(grad_orientations.data + n * orr_sN, orr_sC, orr_sR, ox, oy, oz, tIx, tIy, tIz);
+
                         matMultT(orientation.data + n * orr_sN, orr_sC, orr_sR, tIx, tIy, tIz, &gix, &giy, &giz);
-                        grad_positions.data[pos_offset] = gix_mult * gix;
-                        grad_positions.data[pos_offset + pos_sCoor] = giy_mult * giy;
-                        grad_positions.data[pos_offset + 2 * pos_sCoor] = giz_mult * giz;
+                        grad_positions.data[pos_offset] = gix;
+                        grad_positions.data[pos_offset + pos_sCoor] = giy;
+                        grad_positions.data[pos_offset + 2 * pos_sCoor] = giz;
                     }
                     
-                    ///*
-                    //We are ignoring NN for now, as it does not really apply to us
-                    //else if (interpolation_mode == GridSamplerInterpolation::Nearest) {
-                    //    auto ix_nearest = static_cast<index_t>(::round(ix));
-                    //    auto iy_nearest = static_cast<index_t>(::round(iy));
-                    //    auto iz_nearest = static_cast<index_t>(::round(iz));
-
-                    //    // assign nearest neighor pixel value to output pixel
-                    //    scalar_t* inp_ptr_NCDHW = input.data + n * inp_sN + d * inp_sD + h * inp_sH + w * inp_sW;
-                    //    scalar_t* gInp_ptr_NC = grainput.data + n * gInp_sN;
-                    //    for (index_t c = 0; c < C; ++c, inp_ptr_NCDHW += inp_sC, gInp_ptr_NC += gInp_sC) {
-                    //        // calculate and set grainput
-                    //        safe_add_3d(gInp_ptr_NC, iz_nearest, iy_nearest, ix_nearest,
-                    //            gInp_sD, gInp_sH, gInp_sW, out_D, out_H, out_W, *inp_ptr_NCDHW);
-                    //    }
-
-                    //    // assuming grad_grid is contiguous
-                    //    // thus we can
-                    //    //   1. use index with gGrid_sW to directly compute gGrid_ptr_NDHW
-                    //    //   2. directly assign to gGrid_ptr_NDHW[0], gGrid_ptr_NDHW[1], gGrid_ptr_NDHW[2]
-                    //    scalar_t* gGrid_ptr_NDHW = grad_grid.data + index * gGrid_sW;
-                    //    gGrid_ptr_NDHW[0] = static_cast<scalar_t>(0);
-                    //    gGrid_ptr_NDHW[1] = static_cast<scalar_t>(0);
-                    //    gGrid_ptr_NDHW[2] = static_cast<scalar_t>(0);
-                    
-                    //*/
                 }
             }
 
@@ -781,6 +755,7 @@ namespace at {
                 TensorInfo<scalar_t, index_t> positions,
                 TensorInfo<scalar_t, index_t> intensities,
                 TensorInfo<scalar_t, index_t> orientation,
+                TensorInfo<scalar_t, index_t> shift,
                 TensorInfo<scalar_t, index_t> output,
                 int64_t x, int64_t y, int64_t z)
                 {
@@ -802,7 +777,8 @@ namespace at {
                 index_t pos_sN = positions.strides[0];
                 index_t pos_sW = positions.strides[1];
                 index_t pos_sCoor = positions.strides[2];
-
+                index_t shift_sN = shift.strides[0];
+                index_t shift_sCoor = shift.strides[1];
 
                 CUDA_KERNEL_LOOP_TYPE(index, nthreads, index_t) {
                     const index_t w = index % pos_W;
@@ -811,9 +787,9 @@ namespace at {
 
                     // get the corresponding output x, y, z co-ordinates from grid
                     // 1st the coordinates saved in grid, i.e. in [-1, 1]
-                    scalar_t ix = positions.data[pos_offset];
-                    scalar_t iy = positions.data[pos_offset + pos_sCoor];
-                    scalar_t iz = positions.data[pos_offset + 2 * pos_sCoor];
+                    scalar_t ix = positions.data[pos_offset] + shift.data[n * shift_sN];
+                    scalar_t iy = positions.data[pos_offset + pos_sCoor] + shift.data[n * shift_sN + shift_sCoor];
+                    scalar_t iz = positions.data[pos_offset + 2 * pos_sCoor] + shift.data[n * shift_sN + 2 * shift_sCoor];
 
                     // 2nd, unnormalized coordinates in [0, outsize-1]
                     ix = atoms_to_grid_compute_source_index(ix, x, GridSamplerPadding::Zeros, true);
@@ -954,12 +930,11 @@ namespace at {
 
             
 
-            Tensor projectAtoms(const Tensor& intensities, const Tensor& positions, const Tensor& orientation, int64_t x, int64_t y, int64_t z) {
+            Tensor projectAtoms(const Tensor& intensities, const Tensor& positions, const Tensor& orientation, const Tensor& shift, int64_t x, int64_t y, int64_t z) {
                 auto N = positions.size(0);
                 auto W = positions.size(1);
 
                 auto output = at::zeros({ N, y, x}, positions.options());
-
                 int64_t count = N*W;
                 bool align_corners = true;
                 if (count > 0) {
@@ -974,6 +949,7 @@ namespace at {
                                     getTensorInfo<scalar_t, int>(positions),
                                     getTensorInfo<scalar_t, int>(intensities),
                                     getTensorInfo<scalar_t, int>(orientation),
+                                    getTensorInfo<scalar_t, int>(shift),
                                     getTensorInfo<scalar_t, int>(output), x, y, z);
                             AT_CUDA_CHECK(cudaGetLastError());
                         }
@@ -984,6 +960,7 @@ namespace at {
                                     getTensorInfo<scalar_t, int64_t>(positions),
                                     getTensorInfo<scalar_t, int64_t>(intensities),
                                     getTensorInfo<scalar_t, int64_t>(orientation),
+                                    getTensorInfo<scalar_t, int64_t>(shift),
                                     getTensorInfo<scalar_t, int64_t>(output), x, y, z);
                             AT_CUDA_CHECK(cudaGetLastError());
                         }
@@ -992,8 +969,8 @@ namespace at {
                 return output;// .sum(1, false);
             }
             
-            std::tuple<Tensor, Tensor, Tensor>
-                projectAtoms_backward_cuda(const Tensor& graoutput, const Tensor& intensities, const Tensor& positions, const Tensor& orientation, int64_t x, int64_t y, int64_t z) {
+            std::tuple<Tensor, Tensor, Tensor, Tensor>
+                projectAtoms_backward_cuda(const Tensor& grad_output, const Tensor& intensities, const Tensor& positions, const Tensor& orientation, const Tensor& shift, int64_t x, int64_t y, int64_t z) {
                 auto N = positions.size(0);
                 auto W = positions.size(1);
                 int64_t count = N * W;
@@ -1006,16 +983,18 @@ namespace at {
                     AT_DISPATCH_FLOATING_TYPES_AND_HALF(intensities.scalar_type(), "projectAtoms", [&] {
                         if (canUse32BitIndexMath(positions) &&
                             canUse32BitIndexMath(intensities) && canUse32BitIndexMath(orientation) &&
-                            canUse32BitIndexMath(graoutput)) {
+                            canUse32BitIndexMath(grad_output)) {
                             projectAtoms_backwards_kernel<scalar_t>
                                 << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                                     static_cast<int>(count),
                                     getTensorInfo<scalar_t, int>(positions),
                                     getTensorInfo<scalar_t, int>(intensities),
                                     getTensorInfo<scalar_t, int>(orientation),
-                                    getTensorInfo<scalar_t, int>(graoutput),
+                                    getTensorInfo<scalar_t, int>(shift),
+                                    getTensorInfo<scalar_t, int>(grad_output),
                                     getTensorInfo<scalar_t, int>(grad_positions),
-                                    getTensorInfo<scalar_t, int>(grad_intensities), x, y, z);
+                                    getTensorInfo<scalar_t, int>(grad_intensities),
+                                    getTensorInfo<scalar_t, int>(grad_orientation), x, y, z);
                             AT_CUDA_CHECK(cudaGetLastError());
                         }
                         else {
@@ -1026,15 +1005,18 @@ namespace at {
                                     getTensorInfo<scalar_t, int64_t>(positions),
                                     getTensorInfo<scalar_t, int64_t>(intensities),
                                     getTensorInfo<scalar_t, int64_t>(orientation),
-                                    getTensorInfo<scalar_t, int64_t>(graoutput),
+                                    getTensorInfo<scalar_t, int64_t>(shift),
+                                    getTensorInfo<scalar_t, int64_t>(grad_output),
                                     getTensorInfo<scalar_t, int64_t>(grad_positions),
-                                    getTensorInfo<scalar_t, int64_t>(grad_intensities), x, y, z);
+                                    getTensorInfo<scalar_t, int64_t>(grad_intensities),
+                                    getTensorInfo<scalar_t, int64_t>(grad_orientation), x, y, z);
                             AT_CUDA_CHECK(cudaGetLastError());
                         }
                         });
                 }
-                return std::make_tuple(grad_intensities, grad_positions, grad_orientation);
-            
+                //Lazy Way: Shift gradient is just sum over all atoms. In the kernel, we would need atomic Add operation for this
+                auto grad_shift = grad_positions.sum(1);
+                return std::make_tuple(grad_intensities, grad_positions, grad_orientation, grad_shift);  
             }
 
         }  // namespace

@@ -25,9 +25,9 @@ EXPORT_API(void)     THSNN_ParticleWGANDiscriminator_clipweights(const NNModule 
 EXPORT_API(Tensor)   THSNN_ParticleWGANDiscriminator_penalizegradient(const NNModule module, const Tensor real, const Tensor fake, const float lambda);
 
 EXPORT_API(NNModule) THSNN_AtomProjector_ctor(const Tensor intensities, int sizeX, int sizeY, int sizeZ, NNAnyModule* outAsAnyModule);
-EXPORT_API(Tensor)   THSNN_AtomProjector_ProjectToPlane(const NNModule module, const Tensor positions, const Tensor orientations);
+EXPORT_API(Tensor)   THSNN_AtomProjector_ProjectToPlane(const NNModule module, const Tensor positions, const Tensor orientations, const Tensor shift);
 EXPORT_API(Tensor)   THSNN_AtomProjector_RasterToCartesian(const NNModule module, const Tensor positions);
-EXPORT_API(Tensor)   THSNN_ProjectAtomsToPlane(const Tensor intensities, const Tensor positions, const Tensor orientations, const int64_t sizeX, const int64_t sizeY, const int64_t sizeZ);
+EXPORT_API(Tensor)   THSNN_ProjectAtomsToPlane(const Tensor intensities, const Tensor positions, const Tensor orientations, const Tensor shift, const int64_t sizeX, const int64_t sizeY, const int64_t sizeZ);
 EXPORT_API(Tensor)   THSNN_RasterAtomsToCartesian(const Tensor intensities, const Tensor positions, const int64_t sizeX, const int64_t sizeY, const int64_t sizeZ);
 
 EXPORT_API(NNModule) THSNN_DistanceNet_ctor(NNAnyModule* outAsAnyModule);
