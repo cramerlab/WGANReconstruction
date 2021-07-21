@@ -297,42 +297,60 @@ namespace at {
             template <typename scalar_t, typename index_t>
             __global__ void atoms_to_grid_3d_backward_kernel(
                 const index_t nthreads,
-                TensorInfo<scalar_t, index_t> graoutput,
-                TensorInfo<scalar_t, index_t> input,
-                TensorInfo<scalar_t, index_t> grid,
-                TensorInfo<scalar_t, index_t> grainput,  // initialized to zeros
-                TensorInfo<scalar_t, index_t> grad_grid,   // initialized to empty
+                TensorInfo<scalar_t, index_t> grad_output,
+                TensorInfo<scalar_t, index_t> intensities,
+                TensorInfo<scalar_t, index_t> positions,
+                TensorInfo<scalar_t, index_t> orientations,
+                TensorInfo<scalar_t, index_t> shift,
+                TensorInfo<scalar_t, index_t> grad_intensities,  // initialized to zeros
+                TensorInfo<scalar_t, index_t> grad_positions,   // initialized to empty
+                TensorInfo<scalar_t, index_t> grad_orientations,
                 const GridSamplerInterpolation interpolation_mode,
                 const GridSamplerPadding padding_mode,
                 bool align_corners) {
 
-                index_t inp_D = input.sizes[1];
-                index_t inp_H = input.sizes[2];
-                index_t inp_W = input.sizes[3];
-                index_t gOut_D = graoutput.sizes[1];
-                index_t gOut_H = graoutput.sizes[2];
-                index_t gOut_W = graoutput.sizes[3];
-                index_t inp_sN = input.strides[0];
-                index_t inp_sW = input.strides[1];
-                index_t grid_sN = grid.strides[0];
-                index_t grid_sW = grid.strides[1];
-                index_t grid_sCoor = grid.strides[2];
-                index_t gOut_sN = graoutput.strides[0];
-                index_t gOut_sD = graoutput.strides[1];
-                index_t gOut_sH = graoutput.strides[2];
-                index_t gOut_sW = graoutput.strides[3];
-                index_t gInp_sN = grainput.strides[0];
-                index_t gInp_sW = grainput.strides[1];
+                index_t int_D = intensities.sizes[1];
+                index_t int_H = intensities.sizes[2];
+                index_t int_W = intensities.sizes[3];
+                index_t gOut_D = grad_output.sizes[1];
+                index_t gOut_H = grad_output.sizes[2];
+                index_t gOut_W = grad_output.sizes[3];
+                index_t int_sN = intensities.strides[0];
+                index_t int_sW = intensities.strides[1];
+                index_t pos_sN = positions.strides[0];
+                index_t pos_sW = positions.strides[1];
+                index_t pos_sCoor = positions.strides[2];
+                index_t orr_sN = orientations.strides[0];
+                index_t orr_sR = orientations.strides[1];
+                index_t orr_sC = orientations.strides[2];
+                index_t shift_sN = shift.strides[0];
+                index_t shift_sCoor = shift.strides[1];
+                index_t gOut_sN = grad_output.strides[0];
+                index_t gOut_sD = grad_output.strides[1];
+                index_t gOut_sH = grad_output.strides[2];
+                index_t gOut_sW = grad_output.strides[3];
+                index_t gInp_sN = grad_intensities.strides[0];
+                index_t gInp_sW = grad_intensities.strides[1];
 
                 CUDA_KERNEL_LOOP_TYPE(index, nthreads, index_t) {
-                    const index_t w = index % inp_W;
-                    const index_t n = index / (inp_W);
-                    const index_t grid_offset = n * grid_sN + w * grid_sW;
+                    const index_t w = index % int_W;
+                    const index_t n = index / (int_W);
+                    const index_t pos_offset = n * pos_sN + w * pos_sW;
 
-                    // get the corresponding input x, y, z co-ordinates from grid
-                    scalar_t ix = grid.data[grid_offset];
-                    scalar_t iy = grid.data[grid_offset + grid_sCoor];
-                    scalar_t iz = grid.data[grid_offset + 2 * grid_sCoor];
+                    // get the corresponding input x, y, z co-ordinates from pos
+                    scalar_t ix = positions.data[pos_offset] + shift.data[n * shift_sN];
+                    scalar_t iy = positions.data[pos_offset + pos_sCoor] + shift.data[n * shift_sN + shift_sCoor];
+                    scalar_t iz = positions.data[pos_offset + 2 * pos_sCoor] + shift.data[n * shift_sN + 2 * shift_sCoor];
+
+                    //rotate coordinates
+                    scalar_t ox, oy, oz;
+                    ox = ix;
+                    oy = iy;
+                    oz = iz;
+                    scalar_t tIx = ix;
+                    scalar_t tIy = iy;
+                    scalar_t tIz = iz;
+                    matMult(orientations.data + n * orr_sN, orr_sC, orr_sR, tIx, tIy, tIz, &ix, &iy, &iz);
 
                     scalar_t gix_mult, giy_mult, giz_mult;
                     ix = atoms_to_grid_compute_source_index_set_grad(ix, gOut_W, padding_mode, align_corners, &gix_mult);
@@ -386,91 +404,79 @@ namespace at {
                         scalar_t bse = (ix - ix_tnw) * (iy - iy_tnw) * (iz - iz_tnw);
 
                         scalar_t gix = static_cast<scalar_t>(0), giy = static_cast<scalar_t>(0), giz = static_cast<scalar_t>(0), gi = static_cast<scalar_t>(0);
-                        auto inp_ptr_NC = input.data + n * inp_sN;
-                        auto gInp_ptr_NCDHW = grainput.data + n * gInp_sN + w * gInp_sW;
-                        auto inp_val_NCDHW = *(input.data + n * inp_sN + w * inp_sW);
-                        auto gOut_ptr_NC = graoutput.data + n * gOut_sN;
-                        // calculate grad_grid
+                        auto int_ptr_NC = intensities.data + n * int_sN;
+                        auto gInp_ptr_NCDHW = grad_intensities.data + n * gInp_sN + w * gInp_sW;
+                        auto int_val_NCDHW = *(intensities.data + n * int_sN + w * int_sW);
+                        auto gOut_ptr_NC = grad_output.data + n * gOut_sN;
+                        // calculate grad_pos
                         if (within_bounds_3d(iz_tnw, iy_tnw, ix_tnw, gOut_D, gOut_H, gOut_W)) {
                             auto gOut = unsafe_access(gOut_ptr_NC, iz_tnw, iy_tnw, ix_tnw, gOut_sD, gOut_sH, gOut_sW);
                             gi += tnw * gOut;
-                            gix -= inp_val_NCDHW * (iy_bse - iy) * (iz_bse - iz) * gOut;
-                            giy -= inp_val_NCDHW * (ix_bse - ix) * (iz_bse - iz) * gOut;
-                            giz -= inp_val_NCDHW * (ix_bse - ix) * (iy_bse - iy) * gOut;
+                            gix -= int_val_NCDHW * (iy_bse - iy) * (iz_bse - iz) * gOut;
+                            giy -= int_val_NCDHW * (ix_bse - ix) * (iz_bse - iz) * gOut;
+                            giz -= int_val_NCDHW * (ix_bse - ix) * (iy_bse - iy) * gOut;
                         }
                         if (within_bounds_3d(iz_tne, iy_tne, ix_tne, gOut_D, gOut_H, gOut_W)) {
                             auto gOut = unsafe_access(gOut_ptr_NC, iz_tne, iy_tne, ix_tne, gOut_sD, gOut_sH, gOut_sW);
                             gi += tne * gOut;
-                            gix += inp_val_NCDHW * (iy_bsw - iy) * (iz_bsw - iz) * gOut;
-                            giy -= inp_val_NCDHW * (ix - ix_bsw) * (iz_bsw - iz) * gOut;
-                            giz -= inp_val_NCDHW * (ix - ix_bsw) * (iy_bsw - iy) * gOut;
+                            gix += int_val_NCDHW * (iy_bsw - iy) * (iz_bsw - iz) * gOut;
+                            giy -= int_val_NCDHW * (ix - ix_bsw) * (iz_bsw - iz) * gOut;
+                            giz -= int_val_NCDHW * (ix - ix_bsw) * (iy_bsw - iy) * gOut;
                         }
                         if (within_bounds_3d(iz_tsw, iy_tsw, ix_tsw, gOut_D, gOut_H, gOut_W)) {
                             auto gOut = unsafe_access(gOut_ptr_NC, iz_tsw, iy_tsw, ix_tsw, gOut_sD, gOut_sH, gOut_sW);
                             gi += tsw * gOut;
-                            gix -= inp_val_NCDHW * (iy - iy_bne) * (iz_bne - iz) * gOut;
-                            giy += inp_val_NCDHW * (ix_bne - ix) * (iz_bne - iz) * gOut;
-                            giz -= inp_val_NCDHW * (ix_bne - ix) * (iy - iy_bne) * gOut;
+                            gix -= int_val_NCDHW * (iy - iy_bne) * (iz_bne - iz) * gOut;
+                            giy += int_val_NCDHW * (ix_bne - ix) * (iz_bne - iz) * gOut;
+                            giz -= int_val_NCDHW * (ix_bne - ix) * (iy - iy_bne) * gOut;
                         }
                         if (within_bounds_3d(iz_tse, iy_tse, ix_tse, gOut_D, gOut_H, gOut_W)) {
                             auto gOut = unsafe_access(gOut_ptr_NC, iz_tse, iy_tse, ix_tse, gOut_sD, gOut_sH, gOut_sW);
                             gi += tse * gOut;
-                            gix += inp_val_NCDHW * (iy - iy_bnw) * (iz_bnw - iz) * gOut;
-                            giy += inp_val_NCDHW * (ix - ix_bnw) * (iz_bnw - iz) * gOut;
-                            giz -= inp_val_NCDHW * (ix - ix_bnw) * (iy - iy_bnw) * gOut;
+                            gix += int_val_NCDHW * (iy - iy_bnw) * (iz_bnw - iz) * gOut;
+                            giy += int_val_NCDHW * (ix - ix_bnw) * (iz_bnw - iz) * gOut;
+                            giz -= int_val_NCDHW * (ix - ix_bnw) * (iy - iy_bnw) * gOut;
                         }
                         if (within_bounds_3d(iz_bnw, iy_bnw, ix_bnw, gOut_D, gOut_H, gOut_W)) {
                             auto gOut = unsafe_access(gOut_ptr_NC, iz_bnw, iy_bnw, ix_bnw, gOut_sD, gOut_sH, gOut_sW);
                             gi += bnw * gOut;
-                            gix -= inp_val_NCDHW * (iy_tse - iy) * (iz - iz_tse) * gOut;
-                            giy -= inp_val_NCDHW * (ix_tse - ix) * (iz - iz_tse) * gOut;
-                            giz += inp_val_NCDHW * (ix_tse - ix) * (iy_tse - iy) * gOut;
+                            gix -= int_val_NCDHW * (iy_tse - iy) * (iz - iz_tse) * gOut;
+                            giy -= int_val_NCDHW * (ix_tse - ix) * (iz - iz_tse) * gOut;
+                            giz += int_val_NCDHW * (ix_tse - ix) * (iy_tse - iy) * gOut;
                         }
                         if (within_bounds_3d(iz_bne, iy_bne, ix_bne, gOut_D, gOut_H, gOut_W)) {
                             auto gOut = unsafe_access(gOut_ptr_NC, iz_bne, iy_bne, ix_bne, gOut_sD, gOut_sH, gOut_sW);
                             gi += bne * gOut;
-                            gix += inp_val_NCDHW * (iy_tsw - iy) * (iz - iz_tsw) * gOut;
-                            giy -= inp_val_NCDHW * (ix - ix_tsw) * (iz - iz_tsw) * gOut;
-                            giz += inp_val_NCDHW * (ix - ix_tsw) * (iy_tsw - iy) * gOut;
+                            gix += int_val_NCDHW * (iy_tsw - iy) * (iz - iz_tsw) * gOut;
+                            giy -= int_val_NCDHW * (ix - ix_tsw) * (iz - iz_tsw) * gOut;
+                            giz += int_val_NCDHW * (ix - ix_tsw) * (iy_tsw - iy) * gOut;
                         }
                         if (within_bounds_3d(iz_bsw, iy_bsw, ix_bsw, gOut_D, gOut_H, gOut_W)) {
                             auto gOut = unsafe_access(gOut_ptr_NC, iz_bsw, iy_bsw, ix_bsw, gOut_sD, gOut_sH, gOut_sW);
                             gi += bsw * gOut;
-                            gix -= inp_val_NCDHW * (iy - iy_tne) * (iz - iz_tne) * gOut;
-                            giy += inp_val_NCDHW * (ix_tne - ix) * (iz - iz_tne) * gOut;
-                            giz += inp_val_NCDHW * (ix_tne - ix) * (iy - iy_tne) * gOut;
+                            gix -= int_val_NCDHW * (iy - iy_tne) * (iz - iz_tne) * gOut;
+                            giy += int_val_NCDHW * (ix_tne - ix) * (iz - iz_tne) * gOut;
+                            giz += int_val_NCDHW * (ix_tne - ix) * (iy - iy_tne) * gOut;
                         }
                         if (within_bounds_3d(iz_bse, iy_bse, ix_bse, gOut_D, gOut_H, gOut_W)) {
                             auto gOut = unsafe_access(gOut_ptr_NC, iz_bse, iy_bse, ix_bse, gOut_sD, gOut_sH, gOut_sW);
                             gi += bse * gOut;
-                            gix += inp_val_NCDHW * (iy - iy_tnw) * (iz - iz_tnw) * gOut;
-                            giy += inp_val_NCDHW * (ix - ix_tnw) * (iz - iz_tnw) * gOut;
-                            giz += inp_val_NCDHW * (ix - ix_tnw) * (iy - iy_tnw) * gOut;
+                            gix += int_val_NCDHW * (iy - iy_tnw) * (iz - iz_tnw) * gOut;
+                            giy += int_val_NCDHW * (ix - ix_tnw) * (iz - iz_tnw) * gOut;
+                            giz += int_val_NCDHW * (ix - ix_tnw) * (iy - iy_tnw) * gOut;
                         }
                         *(gInp_ptr_NCDHW) = gi;
-                        grad_grid.data[grid_offset] = gix_mult * gix;
-                        grad_grid.data[grid_offset + grid_sCoor] = giy_mult * giy;
-                        grad_grid.data[grid_offset + 2 * grid_sCoor] = giz_mult * giz;
-                    }
-                    /*  We are ignoring NN for now, as it does not really apply to us
-                    else if (interpolation_mode == GridSamplerInterpolation::Nearest) {
-                        index_t ix_nearest = static_cast<index_t>(::round(ix));
-                        index_t iy_nearest = static_cast<index_t>(::round(iy));
-                        index_t iz_nearest = static_cast<index_t>(::round(iz));
 
-                        // assign nearest neighor pixel value to output pixel
-                        auto inp_ptr_NC = input.data + n * inp_sN;
-                        auto out_ptr_NCDHW = graoutput.data + n * out_sN + d * out_sD + h * out_sH + w * out_sW;
-                        for (index_t c = 0; c < C; ++c, inp_ptr_NC += inp_sC, out_ptr_NCDHW += out_sC) {
-                            if (within_bounds_3d(iz_nearest, iy_nearest, ix_nearest, inp_D, inp_H, inp_W)) {
-                                *gInp_ptr_NCDHW = inp_ptr_NC[iz_nearest * inp_sD + iy_nearest * inp_sH + ix_nearest * inp_sW];
-                            }
-                            else {
-                                *gOut_ptr_NCDHW = static_cast<scalar_t>(0);
-                            }
-                        }
+                        tIx = gix * gix_mult;
+                        tIy = giy * giy_mult;
+                        tIz = giz * giz_mult;
+                        safe_matGrad(grad_orientations.data + n * orr_sN, orr_sC, orr_sR, ox, oy, oz, tIx, tIy, tIz);
+
+                        matMultT(orientations.data + n * orr_sN, orr_sC, orr_sR, tIx, tIy, tIz, &gix, &giy, &giz);
+                        grad_positions.data[pos_offset] = gix;
+                        grad_positions.data[pos_offset + pos_sCoor] = giy;
+                        grad_positions.data[pos_offset + 2 * pos_sCoor] = giz;
                     }
-                    */
                 }
             }
 
@@ -478,8 +484,10 @@ namespace at {
             template <typename scalar_t, typename index_t>
             __global__ void atoms_to_grid_3d_kernel(
                 const index_t nthreads,
-                TensorInfo<scalar_t, index_t> input,
-                TensorInfo<scalar_t, index_t> grid,
+                TensorInfo<scalar_t, index_t> intensities,
+                TensorInfo<scalar_t, index_t> positions,
+                TensorInfo<scalar_t, index_t> orientations,
+                TensorInfo<scalar_t, index_t> shift,
                 TensorInfo<scalar_t, index_t> output, //Initialized to zeros
                 const GridSamplerInterpolation interpolation_mode,
                 const GridSamplerPadding padding_mode,
@@ -489,28 +497,38 @@ namespace at {
                 index_t out_D = output.sizes[1];
                 index_t out_H = output.sizes[2];
                 index_t out_W = output.sizes[3];
-                index_t grid_N = grid.sizes[0];
-                index_t grid_W = grid.sizes[1];
+                index_t pos_N = positions.sizes[0];
+                index_t pos_W = positions.sizes[1];
+                index_t orr_sN = orientations.strides[0];
+                index_t orr_sR = orientations.strides[1];
+                index_t orr_sC = orientations.strides[2];
                 index_t out_sN = output.strides[0];
                 index_t out_sD = output.strides[1];
                 index_t out_sH = output.strides[2];
                 index_t out_sW = output.strides[3];
-                index_t grid_sN = grid.strides[0];
-                index_t grid_sW = grid.strides[1];
-                index_t grid_sCoor = grid.strides[2];
-                index_t inp_sN = input.strides[0];
-                index_t inp_sW = input.strides[1];
+                index_t pos_sN = positions.strides[0];
+                index_t pos_sW = positions.strides[1];
+                index_t pos_sCoor = positions.strides[2];
+                index_t shift_sN = shift.strides[0];
+                index_t shift_sCoor = shift.strides[1];
+                index_t int_sN = intensities.strides[0];
+                index_t int_sW = intensities.strides[1];
 
                 CUDA_KERNEL_LOOP_TYPE(index, nthreads, index_t) {
-                    const index_t w = index % grid_W;
-                    const index_t n = index / (grid_W);
-                    const auto grid_offset = n * grid_sN + w * grid_sW;
+                    const index_t w = index % pos_W;
+                    const index_t n = index / (pos_W);
+                    const auto pos_offset = n * pos_sN + w * pos_sW;
 
-                    // get the corresponding output x, y, z co-ordinates from grid
-                    // 1st the coordinates saved in grid, i.e. in [-1, 1]
-                    scalar_t ix = grid.data[grid_offset];
-                    scalar_t iy = grid.data[grid_offset + grid_sCoor];
-                    scalar_t iz = grid.data[grid_offset + 2 * grid_sCoor];
+                    // get the corresponding output x, y, z co-ordinates from pos
+                    // 1st the coordinates saved in pos, i.e. in [-1, 1]
+                    scalar_t ix = positions.data[pos_offset] + shift.data[n * shift_sN];
+                    scalar_t iy = positions.data[pos_offset + pos_sCoor] + shift.data[n * shift_sN + shift_sCoor];
+                    scalar_t iz = positions.data[pos_offset + 2 * pos_sCoor] + shift.data[n * shift_sN + 2 * shift_sCoor];
+
+                    scalar_t tIx = ix;
+                    scalar_t tIy = iy;
+                    scalar_t tIz = iz;
+                    matMult(orientations.data + n * orr_sN, orr_sC, orr_sR, tIx, tIy, tIz, &ix, &iy, &iz);
 
                     // 2nd, unnormalized coordinates in [0, outsize-1]
                     ix = atoms_to_grid_compute_source_index(ix, out_W, padding_mode, align_corners);
@@ -563,18 +581,18 @@ namespace at {
                     scalar_t bse = (ix - ix_tnw) * (iy - iy_tnw) * (iz - iz_tnw);
 
                     //intensity value at current grid position
-                    scalar_t inp_val_NCDHW = *(input.data + n * inp_sN + w * inp_sW);
+                    scalar_t int_val_NCDHW = *(intensities.data + n * int_sN + w * int_sW);
                     scalar_t * out_ptr_NC = output.data + n * out_sN;
 
                     // calculate bilinear weighted pixel value and set output pixel
-                    safe_add_3d(out_ptr_NC, iz_tnw, iy_tnw, ix_tnw, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * tnw);
-                    safe_add_3d(out_ptr_NC, iz_tne, iy_tne, ix_tne, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * tne);
-                    safe_add_3d(out_ptr_NC, iz_tsw, iy_tsw, ix_tsw, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * tsw);
-                    safe_add_3d(out_ptr_NC, iz_tse, iy_tse, ix_tse, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * tse);
-                    safe_add_3d(out_ptr_NC, iz_bnw, iy_bnw, ix_bnw, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * bnw);
-                    safe_add_3d(out_ptr_NC, iz_bne, iy_bne, ix_bne, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * bne);
-                    safe_add_3d(out_ptr_NC, iz_bsw, iy_bsw, ix_bsw, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * bsw);
-                    safe_add_3d(out_ptr_NC, iz_bse, iy_bse, ix_bse, out_sD, out_sH, out_sW, out_D, out_H, out_W, inp_val_NCDHW * bse);
+                    safe_add_3d(out_ptr_NC, iz_tnw, iy_tnw, ix_tnw, out_sD, out_sH, out_sW, out_D, out_H, out_W, int_val_NCDHW * tnw);
+                    safe_add_3d(out_ptr_NC, iz_tne, iy_tne, ix_tne, out_sD, out_sH, out_sW, out_D, out_H, out_W, int_val_NCDHW * tne);
+                    safe_add_3d(out_ptr_NC, iz_tsw, iy_tsw, ix_tsw, out_sD, out_sH, out_sW, out_D, out_H, out_W, int_val_NCDHW * tsw);
+                    safe_add_3d(out_ptr_NC, iz_tse, iy_tse, ix_tse, out_sD, out_sH, out_sW, out_D, out_H, out_W, int_val_NCDHW * tse);
+                    safe_add_3d(out_ptr_NC, iz_bnw, iy_bnw, ix_bnw, out_sD, out_sH, out_sW, out_D, out_H, out_W, int_val_NCDHW * bnw);
+                    safe_add_3d(out_ptr_NC, iz_bne, iy_bne, ix_bne, out_sD, out_sH, out_sW, out_D, out_H, out_W, int_val_NCDHW * bne);
+                    safe_add_3d(out_ptr_NC, iz_bsw, iy_bsw, ix_bsw, out_sD, out_sH, out_sW, out_D, out_H, out_W, int_val_NCDHW * bsw);
+                    safe_add_3d(out_ptr_NC, iz_bse, iy_bse, ix_bse, out_sD, out_sH, out_sW, out_D, out_H, out_W, int_val_NCDHW * bse);
                 }
             }
             template <typename scalar_t, typename index_t>
@@ -835,23 +853,25 @@ namespace at {
             }
             
             // No shape checking needed here. See # NOTE [ atoms_to_grid Native Functions ].
-            Tensor atoms_to_grid_3d_cuda(const Tensor& input, const Tensor& grid, int64_t x, int64_t y, int64_t z) {
-                auto N = grid.size(0);
-                auto W = grid.size(1);
-                auto output = at::zeros({ N, z, y, x }, input.options());
+            Tensor atoms_to_grid_3d_cuda(const Tensor& intensities, const Tensor& positions, const Tensor& orientations, const Tensor& shift, int64_t x, int64_t y, int64_t z) {
+                auto N = positions.size(0);
+                auto W = positions.size(1);
+                auto output = at::zeros({ N, z, y, x }, intensities.options());
                 int64_t count = N * W;
                 GridSamplerInterpolation interpolation_mode = GridSamplerInterpolation::Bilinear;
                 GridSamplerPadding padding_mode = GridSamplerPadding::Zeros;
                 bool align_corners = true;
                 if (count > 0) {
-                    AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "atoms_to_grid_3d_cuda", [&] {
-                        if (canUse32BitIndexMath(input) && canUse32BitIndexMath(grid) &&
+                    AT_DISPATCH_FLOATING_TYPES_AND_HALF(intensities.scalar_type(), "atoms_to_grid_3d_cuda", [&] {
+                        if (canUse32BitIndexMath(intensities) && canUse32BitIndexMath(positions) &&
                             canUse32BitIndexMath(output)) {
                             atoms_to_grid_3d_kernel<scalar_t>
                                 << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                                     static_cast<int>(count),
-                                    getTensorInfo<scalar_t, int>(input),
-                                    getTensorInfo<scalar_t, int>(grid),
+                                    getTensorInfo<scalar_t, int>(intensities),
+                                    getTensorInfo<scalar_t, int>(positions),
+                                    getTensorInfo<scalar_t, int>(orientations),
+                                    getTensorInfo<scalar_t, int>(shift),
                                     getTensorInfo<scalar_t, int>(output),
                                     static_cast<GridSamplerInterpolation>(interpolation_mode),
                                     static_cast<GridSamplerPadding>(padding_mode),
@@ -862,8 +882,10 @@ namespace at {
                             atoms_to_grid_3d_kernel<scalar_t>
                                 << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                                     count,
-                                    getTensorInfo<scalar_t, int64_t>(input),
-                                    getTensorInfo<scalar_t, int64_t>(grid),
+                                    getTensorInfo<scalar_t, int64_t>(intensities),
+                                    getTensorInfo<scalar_t, int64_t>(positions),
+                                    getTensorInfo<scalar_t, int64_t>(orientations),
+                                    getTensorInfo<scalar_t, int64_t>(shift),
                                     getTensorInfo<scalar_t, int64_t>(output),
                                     static_cast<GridSamplerInterpolation>(interpolation_mode),
                                     static_cast<GridSamplerPadding>(padding_mode),
@@ -876,9 +898,9 @@ namespace at {
             }
 
             // No shape checking needed here. See # NOTE [ atoms_to_grid Native Functions ].
-            std::tuple<Tensor, Tensor>
-                atoms_to_grid_3d_backward_cuda(const Tensor& gradoutput, const Tensor& intensities,
-                    const Tensor& positions) {
+            std::tuple<Tensor, Tensor, Tensor, Tensor>
+                atoms_to_grid_3d_backward_cuda(const Tensor& grad_output, const Tensor& intensities,
+                    const Tensor& positions, const Tensor& orientations, const Tensor& shift) {
                 // See Note [Writing Nondeterministic Operations]
                 // Nondeterministic because of atomicAdd usage
                 globalContext().alertNotDeterministic("atoms_to_grid_3d_backward_cuda");
@@ -890,20 +912,24 @@ namespace at {
                 bool align_corners = true;
                 auto grad_intensities = at::zeros_like(intensities, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
                 auto grad_positions = at::empty_like(positions, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+                auto grad_orientations = at::zeros_like(orientations, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
                 if (count > 0) {
                     AT_DISPATCH_FLOATING_TYPES_AND_HALF(intensities.scalar_type(), "atoms_to_grid_3d_backward_cuda", [&] {
                         
                         if (canUse32BitIndexMath(intensities) && canUse32BitIndexMath(positions) &&
-                            canUse32BitIndexMath(gradoutput)) {
+                            canUse32BitIndexMath(grad_output)) {
 
                             atoms_to_grid_3d_backward_kernel<scalar_t>
                                 << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                                     static_cast<int>(count),
-                                    getTensorInfo<scalar_t, int>(gradoutput),
+                                    getTensorInfo<scalar_t, int>(grad_output),
                                     getTensorInfo<scalar_t, int>(intensities),
                                     getTensorInfo<scalar_t, int>(positions),
+                                    getTensorInfo<scalar_t, int>(orientations),
+                                    getTensorInfo<scalar_t, int>(shift),
                                     getTensorInfo<scalar_t, int>(grad_intensities),
                                     getTensorInfo<scalar_t, int>(grad_positions),
+                                    getTensorInfo<scalar_t, int>(grad_orientations),
                                     static_cast<GridSamplerInterpolation>(interpolation_mode),
                                     static_cast<GridSamplerPadding>(padding_mode),
                                     align_corners);
@@ -913,19 +939,23 @@ namespace at {
                             atoms_to_grid_3d_backward_kernel<scalar_t>
                                 << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                                     count,
-                                    getTensorInfo<scalar_t, int64_t>(gradoutput),
+                                    getTensorInfo<scalar_t, int64_t>(grad_output),
                                     getTensorInfo<scalar_t, int64_t>(intensities),
                                     getTensorInfo<scalar_t, int64_t>(positions),
+                                    getTensorInfo<scalar_t, int64_t>(orientations),
+                                    getTensorInfo<scalar_t, int64_t>(shift),
                                     getTensorInfo<scalar_t, int64_t>(grad_intensities),
                                     getTensorInfo<scalar_t, int64_t>(grad_positions),
+                                    getTensorInfo<scalar_t, int64_t>(grad_orientations),
                                     static_cast<GridSamplerInterpolation>(interpolation_mode),
                                     static_cast<GridSamplerPadding>(padding_mode),
                                     align_corners);
-                            AT_CUDA_CHECK(cudaGetLastError());
+                            AT_CUDA_CHECK(cudaGetLastError()); 
                         }
                         });
                 }
-                return std::make_tuple(grad_intensities, grad_positions);
+                auto grad_shift = grad_positions.sum(1);
+                return std::make_tuple(grad_intensities, grad_positions, grad_orientations, grad_shift);
             }
 
             

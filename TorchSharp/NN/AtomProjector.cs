@@ -11,19 +11,27 @@ namespace TorchSharp.NN
         [DllImport("LibTorchSharp")]
         private static extern IntPtr THSNN_AtomProjector_ProjectToPlane(Module.HType module, IntPtr positions, IntPtr orientations, IntPtr shift);
 
-        public TorchTensor ProjectToPlane(TorchTensor positions, TorchTensor orientations, TorchTensor shift)
+        public TorchTensor ProjectToPlane(TorchTensor positions, TorchTensor orientations, TorchTensor shift=null)
         {
+            if (shift is null)
+            {
+                shift = Float32Tensor.Zeros(new long[] { positions.Shape[0], 3 }, DeviceType.CUDA);
+            }
             var res = THSNN_AtomProjector_ProjectToPlane(handle, positions.Handle, orientations.Handle, shift.Handle);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }
 
         [DllImport("LibTorchSharp")]
-        private static extern IntPtr THSNN_AtomProjector_RasterToCartesian(Module.HType module, IntPtr positions);
+        private static extern IntPtr THSNN_AtomProjector_RasterToCartesian(Module.HType module, IntPtr positions, IntPtr orientations, IntPtr shift);
 
-        public TorchTensor RasterToCartesian(TorchTensor positions)
+        public TorchTensor RasterToCartesian(TorchTensor positions, TorchTensor orientations, TorchTensor shift=null)
         {
-            var res = THSNN_AtomProjector_RasterToCartesian(handle, positions.Handle);
+            if (shift is null)
+            {
+                shift = Float32Tensor.Zeros(new long[] { positions.Shape[0], 3 }, DeviceType.CUDA);
+            }
+            var res = THSNN_AtomProjector_RasterToCartesian(handle, positions.Handle, orientations.Handle, shift.Handle);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }
@@ -33,17 +41,25 @@ namespace TorchSharp.NN
 
         public static TorchTensor ProjectAtomsToPlane(TorchTensor intensities, TorchTensor positions, TorchTensor orientations, TorchTensor shift, int sizeX, int sizeY, int sizeZ)
         {
+            if (shift is null)
+            {
+                shift = Float32Tensor.Zeros(new long[] { positions.Shape[0], 3 });
+            }
             var res = THSNN_ProjectAtomsToPlane(intensities.Handle, positions.Handle, orientations.Handle, shift.Handle, sizeX, sizeY, sizeZ);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }
 
         [DllImport("LibTorchSharp")]
-        private static extern IntPtr THSNN_RasterAtomsToCartesian(IntPtr intensities, IntPtr positions, long sizeX, long sizeY, long sizeZ);
+        private static extern IntPtr THSNN_RasterAtomsToCartesian(IntPtr intensities, IntPtr positions, IntPtr shift, long sizeX, long sizeY, long sizeZ);
 
-        public static TorchTensor RasterAtomsToCartesian(TorchTensor intensities, TorchTensor positions, int sizeX, int sizeY, int sizeZ)
+        public static TorchTensor RasterAtomsToCartesian(TorchTensor intensities, TorchTensor positions, TorchTensor shift, int sizeX, int sizeY, int sizeZ)
         {
-            var res = THSNN_RasterAtomsToCartesian(intensities.Handle, positions.Handle, sizeX, sizeY, sizeZ);
+            if (shift is null)
+            {
+                shift = Float32Tensor.Zeros(new long[] { positions.Shape[0], 3 }, DeviceType.CUDA);
+            }
+            var res = THSNN_RasterAtomsToCartesian(intensities.Handle, positions.Handle, shift.Handle, sizeX, sizeY, sizeZ);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }

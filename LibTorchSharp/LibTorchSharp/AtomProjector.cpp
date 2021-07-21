@@ -25,9 +25,9 @@ struct AtomProjectorImpl : MultiGPUModule
 		return projectAtoms(_intensities.expand({ orientations.size(0), -1 }), positions, orientations, shift, _sizeX, _sizeY, _sizeZ);
 	}
 
-	torch::Tensor RasterToCartesian(const torch::Tensor& positions) 
+	torch::Tensor RasterToCartesian(const torch::Tensor& positions, const torch::Tensor& orientations, const torch::Tensor& shift)
 	{
-		return atoms_to_grid(_intensities.expand({ positions.size(0), -1 }), positions, _sizeX, _sizeY, _sizeZ);
+		return atoms_to_grid(_intensities.expand({ positions.size(0), -1 }), positions, orientations, shift, _sizeX, _sizeY, _sizeZ);
 	}
 
 	torch::Tensor forward() 
@@ -63,9 +63,9 @@ Tensor THSNN_AtomProjector_ProjectToPlane(const NNModule module, const Tensor po
 	CATCH_TENSOR((*module)->as<AtomProjectorImpl>()->ProjectToPlane(*positions, *orientations, *shift));
 }
 
-Tensor THSNN_AtomProjector_RasterToCartesian(const NNModule module, const Tensor positions)
+Tensor THSNN_AtomProjector_RasterToCartesian(const NNModule module, const Tensor positions, const Tensor orientations, const Tensor shift)
 {
-	CATCH_TENSOR((*module)->as<AtomProjectorImpl>()->RasterToCartesian(*positions));
+	CATCH_TENSOR((*module)->as<AtomProjectorImpl>()->RasterToCartesian(*positions, *orientations, *shift));
 }
 
 Tensor THSNN_ProjectAtomsToPlane(const Tensor intensities, const Tensor positions, const Tensor orientations, const Tensor shift, const int64_t sizeX, const int64_t sizeY, const int64_t sizeZ)
@@ -73,7 +73,7 @@ Tensor THSNN_ProjectAtomsToPlane(const Tensor intensities, const Tensor position
 	CATCH_TENSOR(projectAtoms(intensities->expand({ orientations->size(0), -1 }), *positions, *orientations, *shift, sizeX, sizeY, sizeZ));
 }
 
-Tensor THSNN_RasterAtomsToCartesian(const Tensor intensities, const Tensor positions, const int64_t sizeX, const int64_t sizeY, const int64_t sizeZ)
+Tensor THSNN_RasterAtomsToCartesian(const Tensor intensities, const Tensor positions, const Tensor orientations, const Tensor shift, const int64_t sizeX, const int64_t sizeY, const int64_t sizeZ)
 {
-	CATCH_TENSOR(atoms_to_grid(intensities->expand({ positions->size(0), -1 }), *positions, sizeX, sizeY, sizeZ));
+	CATCH_TENSOR(atoms_to_grid(intensities->expand({ positions->size(0), -1 }), *positions, *orientations, *shift, sizeX, sizeY, sizeZ));
 }
