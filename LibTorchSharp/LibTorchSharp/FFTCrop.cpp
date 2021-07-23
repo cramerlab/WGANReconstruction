@@ -7,12 +7,7 @@
 
 using namespace torch::indexing;
 
-Tensor THSNN_FFTCrop(const Tensor fft_volume, int new_x, int new_y, int new_z)
-{
-    CATCH_TENSOR(fft_crop(*fft_volume, new_x, new_y, new_z));
-}
-
-torch::Tensor new_FFTCrop(torch::Tensor& fft_volume, int dim, int new_x, int new_y, int new_z) {
+torch::Tensor fft_crop(torch::Tensor& fft_volume, int dim, int new_x, int new_y, int new_z) {
 
     auto n = fft_volume.ndimension();
 
@@ -56,7 +51,7 @@ torch::Tensor new_FFTCrop(torch::Tensor& fft_volume, int dim, int new_x, int new
 }
 
 
-Tensor THSNN_new_FFTCrop(Tensor fft_volume, int dim, int new_x, int new_y, int new_z)
+Tensor THSNN_FFTCrop(Tensor fft_volume, int dim, int new_x, int new_y, int new_z)
 {
-    CATCH_TENSOR(new_FFTCrop(*fft_volume, dim, new_x, new_y, new_z));
+    CATCH_TENSOR(fft_crop(*fft_volume, dim, new_x, new_y, new_z));
 }
