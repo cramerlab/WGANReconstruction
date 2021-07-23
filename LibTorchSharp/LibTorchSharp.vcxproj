@@ -14,6 +14,7 @@
     <ClCompile Include="LibTorchSharp\AtomProjector.cpp" />
     <ClCompile Include="LibTorchSharp\C2DNet.cpp" />
     <ClCompile Include="LibTorchSharp\cifar10.cpp" />
+    <ClCompile Include="LibTorchSharp\CustomOperatorsBackend.cpp" />
     <ClCompile Include="LibTorchSharp\DistanceNet.cpp" />
     <ClCompile Include="LibTorchSharp\FFTCrop.cpp" />
     <ClCompile Include="LibTorchSharp\MLP.cpp" />
@@ -49,8 +50,8 @@
     <ClInclude Include="UnixSal.h" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="LibTorchSharp\FFTCropBackend.cu" />
     <CudaCompile Include="LibTorchSharp\CustomOperatorsBackend.cu" />
+    <CudaCompile Include="LibTorchSharp\FFTCropBackend.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

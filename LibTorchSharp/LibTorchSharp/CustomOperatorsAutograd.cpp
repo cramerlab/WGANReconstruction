@@ -10,6 +10,9 @@ torch::Tensor atoms_to_grid(const torch::Tensor& intensities, const torch::Tenso
 	static auto op = torch::Dispatcher::singleton()
 		.findSchemaOrThrow("myops::atoms_to_grid", "")
 		.typed<decltype(atoms_to_grid)>();
+	// Make sure that we have expected dimensionality for the lower level function calls
+	TORCH_CHECK(intensities.dim() == 2 && positions.dim() == 3 && orientations.dim() == 3 && shift.dim() == 2);
+	TORCH_CHECK(intensities.size(0) == positions.size(0) && orientations.size(0) == positions.size(0) && shift.size(0) == positions.size(0));
 	return op.call(intensities, positions, orientations, shift, x, y, z);
 }
 
@@ -17,6 +20,7 @@ tensor_list atoms_to_grid_backwards(const torch::Tensor& grad_output, const torc
 	static auto op = torch::Dispatcher::singleton()
 		.findSchemaOrThrow("myops::atoms_to_grid_backwards", "")
 		.typed<decltype(atoms_to_grid_backwards)>();
+	//No need to check in backwards pass
 	return op.call(grad_output, intensities, positions, orientations, shift);
 }
 
@@ -61,6 +65,9 @@ torch::Tensor projectAtoms(const torch::Tensor& intensities, const torch::Tensor
 	static auto op = torch::Dispatcher::singleton()
 		.findSchemaOrThrow("myops::projectAtoms", "")
 		.typed<decltype(projectAtoms)>();
+	// Make sure that we have expected dimensionality for the lower level function calls
+	TORCH_CHECK(intensities.dim() == 2 && positions.dim() == 3 && orientation.dim() == 3 && shift.dim() == 2);
+	TORCH_CHECK(intensities.size(0) == positions.size(0) && orientation.size(0) == positions.size(0) && shift.size(0) == positions.size(0));
 	return op.call(intensities, positions, orientation, shift, x, y, z);
 }
 
