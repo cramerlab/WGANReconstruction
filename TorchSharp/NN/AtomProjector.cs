@@ -11,12 +11,8 @@ namespace TorchSharp.NN
         [DllImport("LibTorchSharp")]
         private static extern IntPtr THSNN_AtomProjector_ProjectToPlane(Module.HType module, IntPtr positions, IntPtr orientations, IntPtr shift);
 
-        public TorchTensor ProjectToPlane(TorchTensor positions, TorchTensor orientations, TorchTensor shift=null)
+        public TorchTensor ProjectToPlane(TorchTensor positions, TorchTensor orientations, TorchTensor shift)
         {
-            if (shift is null)
-            {
-                shift = Float32Tensor.Zeros(new long[] { positions.Shape[0], 3 }, DeviceType.CUDA);
-            }
             var res = THSNN_AtomProjector_ProjectToPlane(handle, positions.Handle, orientations.Handle, shift.Handle);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
@@ -25,12 +21,8 @@ namespace TorchSharp.NN
         [DllImport("LibTorchSharp")]
         private static extern IntPtr THSNN_AtomProjector_RasterToCartesian(Module.HType module, IntPtr positions, IntPtr orientations, IntPtr shift);
 
-        public TorchTensor RasterToCartesian(TorchTensor positions, TorchTensor orientations, TorchTensor shift=null)
+        public TorchTensor RasterToCartesian(TorchTensor positions, TorchTensor orientations, TorchTensor shift)
         {
-            if (shift is null)
-            {
-                shift = Float32Tensor.Zeros(new long[] { positions.Shape[0], 3 }, DeviceType.CUDA);
-            }
             var res = THSNN_AtomProjector_RasterToCartesian(handle, positions.Handle, orientations.Handle, shift.Handle);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
@@ -39,27 +31,19 @@ namespace TorchSharp.NN
         [DllImport("LibTorchSharp")]
         private static extern IntPtr THSNN_ProjectAtomsToPlane(IntPtr intensities, IntPtr positions, IntPtr orientations, IntPtr shift, long sizeX, long sizeY, long sizeZ);
 
-        public static TorchTensor ProjectAtomsToPlane(TorchTensor intensities, TorchTensor positions, TorchTensor orientations, TorchTensor shift, int sizeX, int sizeY, int sizeZ)
+        public static TorchTensor ProjectAtomsToPlane(TorchTensor intensities, TorchTensor positions, TorchTensor orientations, TorchTensor shifts, int sizeX, int sizeY, int sizeZ)
         {
-            if (shift is null)
-            {
-                shift = Float32Tensor.Zeros(new long[] { positions.Shape[0], 3 });
-            }
-            var res = THSNN_ProjectAtomsToPlane(intensities.Handle, positions.Handle, orientations.Handle, shift.Handle, sizeX, sizeY, sizeZ);
+            var res = THSNN_ProjectAtomsToPlane(intensities.Handle, positions.Handle, orientations.Handle, shifts.Handle, sizeX, sizeY, sizeZ);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }
 
         [DllImport("LibTorchSharp")]
-        private static extern IntPtr THSNN_RasterAtomsToCartesian(IntPtr intensities, IntPtr positions, IntPtr shift, long sizeX, long sizeY, long sizeZ);
+        private static extern IntPtr THSNN_RasterAtomsToCartesian(IntPtr intensities, IntPtr positions, IntPtr orientations, IntPtr shift, long sizeX, long sizeY, long sizeZ);
 
-        public static TorchTensor RasterAtomsToCartesian(TorchTensor intensities, TorchTensor positions, TorchTensor shift, int sizeX, int sizeY, int sizeZ)
+        public static TorchTensor RasterAtomsToCartesian(TorchTensor intensities, TorchTensor positions, TorchTensor orientations, TorchTensor shifts, int sizeX, int sizeY, int sizeZ)
         {
-            if (shift is null)
-            {
-                shift = Float32Tensor.Zeros(new long[] { positions.Shape[0], 3 }, DeviceType.CUDA);
-            }
-            var res = THSNN_RasterAtomsToCartesian(intensities.Handle, positions.Handle, shift.Handle, sizeX, sizeY, sizeZ);
+            var res = THSNN_RasterAtomsToCartesian(intensities.Handle, positions.Handle, orientations.Handle, shifts.Handle, sizeX, sizeY, sizeZ);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }

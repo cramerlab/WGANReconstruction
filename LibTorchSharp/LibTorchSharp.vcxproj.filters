@@ -127,8 +127,5 @@
     <CudaCompile Include="LibTorchSharp\CustomOperatorsBackend.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
-    <CudaCompile Include="LibTorchSharp\FFTCropBackend.cu">
-      <Filter>Source Files</Filter>
-    </CudaCompile>
   </ItemGroup>
 </Project>

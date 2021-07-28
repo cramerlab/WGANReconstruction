@@ -3143,6 +3143,16 @@ namespace TorchSharp.Tensor
         }
 
         [DllImport("LibTorchSharp")]
+        extern static IntPtr THSNN_FFTCrop(IntPtr fft_volume, int new_x, int new_y, int new_z);
+
+        public TorchTensor FFTCrop(int new_x, int new_y, int new_z)
+        {
+            var res = THSNN_FFTCrop(handle, new_x, new_y, new_z);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
+
+        [DllImport("LibTorchSharp")]
         extern static IntPtr THSTensor_pad(IntPtr tensor, long[] pad, long npad);
 
         public TorchTensor Pad(long[] pad)

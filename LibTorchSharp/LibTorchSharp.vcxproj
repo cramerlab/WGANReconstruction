@@ -51,7 +51,6 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="LibTorchSharp\CustomOperatorsBackend.cu" />
-    <CudaCompile Include="LibTorchSharp\FFTCropBackend.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
