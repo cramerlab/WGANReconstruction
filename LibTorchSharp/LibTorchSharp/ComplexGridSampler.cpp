@@ -907,7 +907,7 @@ namespace at {
 
                 auto cp_input = input.clone();
                 foo_a = cp_input.accessor<c10::complex<float>, 5>();
-                for (size_t zz = 0; zz < input.size(2); zz++)
+                /*for (size_t zz = 0; zz < input.size(2); zz++)
                 {
                     for (size_t yy = 0; yy < input.size(3); yy++)
                     {
@@ -920,7 +920,7 @@ namespace at {
                         }
 
                     }
-                }
+                }*/
                 if (count > 0) {
                     complex_grid_sampler_cpu_3d_kernel<float>(
                             static_cast<int>(count),
