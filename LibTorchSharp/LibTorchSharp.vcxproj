@@ -14,6 +14,7 @@
     <ClCompile Include="LibTorchSharp\AtomProjector.cpp" />
     <ClCompile Include="LibTorchSharp\C2DNet.cpp" />
     <ClCompile Include="LibTorchSharp\cifar10.cpp" />
+    <ClCompile Include="LibTorchSharp\ComplexGridSampler.cpp" />
     <ClCompile Include="LibTorchSharp\CustomOperatorsBackend.cpp" />
     <ClCompile Include="LibTorchSharp\DistanceNet.cpp" />
     <ClCompile Include="LibTorchSharp\FFTCrop.cpp" />
@@ -34,6 +35,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LibTorchSharp\cifar10.h" />
+    <ClInclude Include="LibTorchSharp\ComplexGridSampler.h" />
     <ClInclude Include="LibTorchSharp\CustomModules.h" />
     <ClInclude Include="LibTorchSharp\MultiGPUModule.h" />
     <ClInclude Include="LibTorchSharp\parallel.h" />
@@ -50,7 +52,11 @@
     <ClInclude Include="UnixSal.h" />
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="LibTorchSharp\ComplexGridSampler.cu" />
     <CudaCompile Include="LibTorchSharp\CustomOperatorsBackend.cu" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -137,7 +143,7 @@ copy /y "C:\Program Files\NVIDIA Corporation\NvToolsExt\bin\x64\nvToolsExt64_1.d
     </PostBuildEvent>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
-      <AdditionalOptions>-D__CUDA_NO_HALF_OPERATORS__ %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>-D__CUDA_NO_HALF_OPERATORS__  --expt-relaxed-constexpr %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

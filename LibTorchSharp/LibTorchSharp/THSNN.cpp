@@ -1,5 +1,6 @@
 // Copyright (c) Microsoft Corporation and contributors.  All Rights Reserved.  See License.txt in the project root for license information.
 #include "THSNN.h"
+#include "CustomModules.h"
 
 #include <torch/nn/init.h>
 
@@ -755,4 +756,8 @@ void THSNN_AnyModule_dispose(const NNAnyModule module)
 {
     delete module; // NOTE: this only deletes the shared_ptr
 }
+/*
+Tensor THSNN_GridSampling(const Tensor input, const Tensor grid) {
+    CATCH_TENSOR(torch::nn::functional::grid_sample(*input, *grid));
+}*/
 

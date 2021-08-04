@@ -2,7 +2,7 @@
 #include <cuda_runtime.h>
 //#include <torch/torch.h>
 //#include <ATen/ATen.h>
-#include "CustomOperatorsBackend.cuh"
+
 
 #include <ATen/native/cuda/UpSample.cuh>
 #include <ATen/cuda/CUDAContext.h>
@@ -13,6 +13,9 @@
 #include <C10/macros/Macros.h>
 #include <C10/cuda/CUDAException.h>
 #include <ATen/cuda/detail/TensorInfo.cuh>
+
+#include "CustomOperatorsBackend.cuh"
+
 namespace at {
     namespace native {
         using at::native::GridSamplerInterpolation;
@@ -1048,6 +1051,8 @@ namespace at {
                 auto grad_shift = grad_positions.sum(1);
                 return std::make_tuple(grad_intensities, grad_positions, grad_orientation, grad_shift);  
             }
+
+
 
         }  // namespace
     }

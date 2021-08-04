@@ -264,6 +264,14 @@ EXPORT_API(Tensor) THSTensor_erfinv_(const Tensor tensor);
 
 EXPORT_API(Tensor) THSTensor_fill_(const Tensor tensor, Scalar value);
 
+EXPORT_API(Tensor) THSTensor_fftshift(const Tensor tensor, const int64_t* dims, const int64_t ndims);
+
+EXPORT_API(Tensor) THSTensor_ifftshift(const Tensor tensor, const int64_t* dims, const int64_t ndims);
+
+EXPORT_API(Tensor) THSTensor_fftn(const Tensor tensor, const int64_t* dims, const int64_t ndims);
+
+EXPORT_API(Tensor) THSTensor_ifftn(const Tensor tensor, const int64_t* dims, const int64_t ndims);
+
 EXPORT_API(Tensor) THSTensor_rfftn(const Tensor tensor, const int64_t* dims, const int64_t ndims);
 
 EXPORT_API(Tensor) THSTensor_irfftn(const Tensor tensor, const int64_t* dims, const int64_t ndims);

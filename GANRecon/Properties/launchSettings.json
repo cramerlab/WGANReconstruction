@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "GANRecon": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

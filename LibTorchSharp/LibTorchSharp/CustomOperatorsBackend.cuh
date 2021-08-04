@@ -1,4 +1,5 @@
-﻿#include <cuda.h>
+﻿#pragma once
+#include <cuda.h>
 #include <cuda_runtime.h>
 #include <torch/torch.h>
 #include <c10/util/Exception.h>
@@ -21,7 +22,7 @@ namespace at {
         enum class GridSamplerPadding { Zeros, Border, Reflection };
         namespace MyOperator {
             std::tuple<Tensor, Tensor, Tensor, Tensor>
-                 atoms_to_grid_3d_backward_cuda(const Tensor& grad_output, const Tensor& intensities, const Tensor& positions, const Tensor& orientations, const Tensor& shift);
+                atoms_to_grid_3d_backward_cuda(const Tensor& grad_output, const Tensor& intensities, const Tensor& positions, const Tensor& orientations, const Tensor& shift);
 
             Tensor atoms_to_grid_3d_cuda(const Tensor& intensities, const Tensor& positions, const Tensor& orientations, const Tensor& shift, int64_t x, int64_t y, int64_t z);
 
@@ -31,9 +32,23 @@ namespace at {
             std::tuple<Tensor, Tensor, Tensor, Tensor>
                 projectAtoms_backward_cuda(const Tensor& grad_output, const Tensor& intensities, const Tensor& positions, const Tensor& orientation, const Tensor& shift, int64_t x, int64_t y, int64_t z);
 
-            Tensor fft_crop_cuda(const Tensor& fft_volume, int64_t newDims_x, int64_t newDims_y, int64_t newDims_z);
-            
-            Tensor fft_crop_backwards_cuda(const torch::Tensor& grad_output, int64_t oldDims_x, int64_t oldDims_y, int64_t oldDims_z);
+            Tensor complex_grid_sampler_2d_cuda(const Tensor& input, const Tensor& grid,
+                int interpolation_mode, int padding_mode,
+                bool align_corners);
+
+            Tensor complex_grid_sampler_3d_cuda(const Tensor& input, const Tensor& grid,
+                int interpolation_mode, int padding_mode,
+                bool align_corners);
+
+            std::tuple<Tensor, Tensor>
+                complex_grid_sampler_2d_backward_cuda(const Tensor& grad_output, const Tensor& input,
+                    const Tensor& grid, int interpolation_mode,
+                    int padding_mode, bool align_corners);
+
+            std::tuple<Tensor, Tensor>
+                complex_grid_sampler_3d_backward_cuda(const Tensor& grad_output, const Tensor& input,
+                    const Tensor& grid, int interpolation_mode, int padding_mode,
+                    bool align_corners);
         }
     }
 }

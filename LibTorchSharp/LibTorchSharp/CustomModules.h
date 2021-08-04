@@ -46,5 +46,6 @@ EXPORT_API(NNModule) THSNN_MLP_ctor(int64_t* block_widths, int nblocks, bool res
 EXPORT_API(Tensor)   THSNN_MLP_forward(const NNModule module, const Tensor input);
 
 EXPORT_API(Tensor) THSNN_FFTCrop(const Tensor fft_volume, int dim, int new_x, int new_y, int new_z);
+EXPORT_API(Tensor) THSNN_ComplexGridSampling(const Tensor input, const Tensor grid, double max_r2);
 
 EXPORT_API(Tensor) THSNN_MatrixFromAngles(Tensor angles);

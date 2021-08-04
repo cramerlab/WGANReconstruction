@@ -699,6 +699,16 @@ Tensor THSTensor_expand(const Tensor tensor, const int64_t* sizes, const int len
     CATCH_TENSOR(tensor->expand(at::ArrayRef<int64_t>(sizes, length), implicit));
 }
 
+Tensor THSTensor_fftn(const Tensor tensor, const int64_t* dims, const int64_t ndims) {
+    CATCH_TENSOR(torch::fft::fftn(*tensor, c10::nullopt, c10::IntArrayRef(dims, ndims), "forward"));
+}
+
+
+Tensor THSTensor_ifftn(const Tensor tensor, const int64_t* dims, const int64_t ndims) {
+    CATCH_TENSOR(torch::fft::ifftn(*tensor, c10::nullopt, c10::IntArrayRef(dims, ndims), "forward"));
+}
+
+
 Tensor THSTensor_rfftn(const Tensor tensor, const int64_t* dims, const int64_t ndims)
 {
     CATCH_TENSOR(torch::fft::rfftn(*tensor, c10::nullopt, c10::IntArrayRef(dims, ndims), "forward"));

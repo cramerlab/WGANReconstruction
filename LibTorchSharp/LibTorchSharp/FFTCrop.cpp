@@ -1,9 +1,12 @@
 #include "CustomOperatorsAutograd.h"
 #include "CustomModules.h"
+#include "THSTensor.h"
 #include "Utils.h"
 #include <torch/nn/module.h>
 #include <torch/types.h>
 #include <torch/utils.h>
+#include <ATen/DimVector.h>
+using namespace c10;
 
 using namespace torch::indexing;
 
@@ -54,4 +57,54 @@ torch::Tensor fft_crop(torch::Tensor& fft_volume, int dim, int new_x, int new_y,
 Tensor THSNN_FFTCrop(Tensor fft_volume, int dim, int new_x, int new_y, int new_z)
 {
     CATCH_TENSOR(fft_crop(*fft_volume, dim, new_x, new_y, new_z));
+}
+
+at::DimVector default_alldims(const torch::Tensor& self, c10::optional<IntArrayRef> dim_opt) {
+    at::DimVector dim;
+    if (dim_opt) {
+        IntArrayRef dim_unwrapped = *dim_opt;
+        dim.resize(dim_unwrapped.size());
+        for (size_t i = 0; i < dim.size(); i++)
+        {
+            dim[i] = maybe_wrap_dim(dim_unwrapped[i], self.dim());
+        }
+    }
+    else {
+        dim.resize(self.dim());
+        std::iota(dim.begin(), dim.end(), 0);
+    }
+    return dim;
+}
+
+torch::Tensor fftshift(const torch::Tensor& x, c10::optional<IntArrayRef> dim_opt) {
+    auto dim = default_alldims(x, dim_opt);
+
+    IntArrayRef x_sizes = x.sizes();
+    at::DimVector shift(dim.size());
+    for (size_t i = 0; i < dim.size(); i++)
+    {
+        shift[i] = x_sizes[dim[i]] / 2;
+    }
+
+    return at::roll(x, shift, dim);
+}
+
+torch::Tensor ifftshift(const torch::Tensor& x, c10::optional<IntArrayRef> dim_opt) {
+    auto dim = default_alldims(x, dim_opt);
+
+    IntArrayRef x_sizes = x.sizes();
+    at::DimVector shift(dim.size());
+    for (size_t i = 0; i < dim.size(); i++) 
+    {
+        shift[i] = (x_sizes[dim[i]] + 1) / 2;
+    }
+
+    return at::roll(x, shift, dim);
+}
+
+Tensor THSTensor_fftshift(const Tensor tensor, const int64_t* dims, const int64_t ndims) {
+    CATCH_TENSOR(fftshift(*tensor, c10::IntArrayRef(dims, ndims)));
+}
+Tensor THSTensor_ifftshift(const Tensor tensor, const int64_t* dims, const int64_t ndims) {
+    CATCH_TENSOR(ifftshift(*tensor, c10::IntArrayRef(dims, ndims)));
 }

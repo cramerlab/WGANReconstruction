@@ -75,6 +75,9 @@
     <ClCompile Include="LibTorchSharp\CustomOperatorsBackend.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="LibTorchSharp\ComplexGridSampler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LibTorchSharp\cifar10.h">
@@ -122,10 +125,19 @@
     <ClInclude Include="LibTorchSharp\CustomOperatorsBackend.cuh">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="LibTorchSharp\ComplexGridSampler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="LibTorchSharp\CustomOperatorsBackend.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
+    <CudaCompile Include="LibTorchSharp\ComplexGridSampler.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
   </ItemGroup>
 </Project>

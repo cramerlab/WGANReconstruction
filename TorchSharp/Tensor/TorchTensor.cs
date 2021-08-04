@@ -2116,6 +2116,46 @@ namespace TorchSharp.Tensor
         }
 
         [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSTensor_fftshift(IntPtr tensor, long[] dims, long ndims);
+
+        public TorchTensor fftshift(long[] dims)
+        {
+            var res = THSTensor_fftshift(handle, dims, (long)dims.Length);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
+
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSTensor_ifftshift(IntPtr tensor, long[] dims, long ndims);
+
+        public TorchTensor ifftshift(long[] dims)
+        {
+            var res = THSTensor_ifftshift(handle, dims, (long)dims.Length);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
+
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSTensor_fftn(IntPtr tensor, long[] dims, long ndims);
+
+        public TorchTensor fftn(long[] dims)
+        {
+            var res = THSTensor_fftn(handle, dims, (long)dims.Length);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
+
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSTensor_ifftn(IntPtr tensor, long[] dims, long ndims);
+
+        public TorchTensor ifftn(long[] dims)
+        {
+            var res = THSTensor_ifftn(handle, dims, (long)dims.Length);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
+
+        [DllImport("LibTorchSharp")]
         private static extern IntPtr THSTensor_rfftn(IntPtr tensor, long[] dims, long ndims);
 
         public TorchTensor rfftn(long[] dims)
