@@ -874,7 +874,7 @@ Tensor THSTensor_gt_scalar_(const Tensor left, const Scalar right)
 
 Tensor THSTensor_imag(const Tensor tensor)
 {
-    AT_ASSERT(tensor->is_complex());
+    TORCH_CHECK(tensor->is_complex());
     CATCH_TENSOR(at::imag(*tensor));
 }
 

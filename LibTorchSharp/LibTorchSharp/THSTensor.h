@@ -483,6 +483,8 @@ EXPORT_API(Tensor) THSTensor_maxunpool3d(
 
 EXPORT_API(Tensor) THSTensor_mean(const Tensor tensor);
 
+EXPORT_API(Tensor) THSTensor_mean_along_dimensions(const Tensor tensor, const int64_t* dimensions, int length, bool keepdim, bool has_type, const int8_t dtype);
+
 EXPORT_API(Tensor) THSTensor_median(const Tensor tensor);
 
 EXPORT_API(Tensor) THSTensor_mm(const Tensor left, const Tensor right);

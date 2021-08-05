@@ -269,6 +269,14 @@ namespace GANRecon
                     }
                 }
 
+
+                TorchTensor tensorRefVolume = Float32Tensor.Zeros(new long[] { 1, 1, boxLength, boxLength, boxLength }, TorchSharp.DeviceType.CUDA);
+                GPU.CopyDeviceToDevice(refVolume.GetDevice(Intent.Read), tensorRefVolume.DataPtr(), refVolume.ElementsReal);
+                TorchTensor tensorProjectionByAverage = tensorRefVolume.Mean(new long[] { 2 });
+
+                Image imageProjectionByAverage = new Image(new int3( boxLength, boxLength,1));
+                GPU.CopyDeviceToDevice(tensorProjectionByAverage.DataPtr(), imageProjectionByAverage.GetDevice(Intent.Write), imageProjectionByAverage.ElementsReal);
+                imageProjectionByAverage.WriteMRC(@$"{directory}\imageProjectionByAverage.mrc", true);
                 return;
                 
                 /*
