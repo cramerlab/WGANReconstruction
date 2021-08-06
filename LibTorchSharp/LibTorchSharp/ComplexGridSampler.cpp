@@ -887,44 +887,18 @@ namespace at {
             // No shape checking needed here. See # NOTE [ complex_grid_sampler_cpu_ Native Functions ].
             Tensor complex_grid_sampler_cpu_3d(const Tensor& input, const Tensor& grid,
                 int interpolation_mode, int padding_mode,
-                bool align_corners, double max_r2) {
+                bool align_corners) {
                 auto N = input.size(0);
                 auto D = grid.size(1);
                 auto H = grid.size(2);
                 auto W = grid.size(3);
                 auto output = at::empty({ N, input.size(1), D, H, W }, input.options());
                 int count = N * D * H * W;
-                std::cout << "input" << std::endl;
-                auto foo_a = input.accessor<c10::complex<float>, 5>();
-                for (size_t yy = 0; yy < 33; yy++)
-                {
-                    for (size_t xx = 0; xx < 33; xx++)
-                    {
-                        std::cout << foo_a[0][0][16][yy][xx] << "\t";
-                    }
-                    std::cout << std::endl;
-                }
 
-                auto cp_input = input.clone();
-                foo_a = cp_input.accessor<c10::complex<float>, 5>();
-                /*for (size_t zz = 0; zz < input.size(2); zz++)
-                {
-                    for (size_t yy = 0; yy < input.size(3); yy++)
-                    {
-                        for (size_t xx = 0; xx < input.size(4); xx++)
-                        {
-                            if ((xx - input.size(4) / 2) * (xx - input.size(4) / 2) + (yy - input.size(3) / 2) * (yy - input.size(3) / 2) + (zz - input.size(2) / 2) * (zz - input.size(2) / 2) > max_r2)
-                                foo_a[0][0][zz][yy][xx] = 0;
-                            //else
-                                //foo_a[0][0][zz][yy][xx] *= 34;
-                        }
-
-                    }
-                }*/
                 if (count > 0) {
                     complex_grid_sampler_cpu_3d_kernel<float>(
                             static_cast<int>(count),
-                            getTensorInfo<c10::complex<float>, int>(cp_input),
+                            getTensorInfo<c10::complex<float>, int>(input),
                             getTensorInfo<float, int>(grid),
                             getTensorInfo<c10::complex<float>, int>(output),
                             static_cast<GridSamplerInterpolation>(interpolation_mode),
@@ -932,16 +906,6 @@ namespace at {
                             align_corners);
 
 
-                }
-                std::cout << "output" << std::endl;
-                auto foo_b = output.accessor<c10::complex<float>, 5>();
-                for (size_t yy = 0; yy < 33; yy++)
-                {
-                    for (size_t xx = 0; xx < 33; xx++)
-                    {
-                        std::cout << foo_b[0][0][0][yy][xx] << "\t";
-                    }
-                    std::cout << std::endl;
                 }
                 return output;
             }
@@ -1014,7 +978,7 @@ namespace at {
 
 
 
-Tensor THSNN_ComplexGridSampling(const Tensor input, const Tensor grid, double max_r2) {
-	CATCH_TENSOR(complexGridSample(*input, *grid, max_r2))
+Tensor THSNN_ComplexGridSampling(const Tensor input, const Tensor grid) {
+	CATCH_TENSOR(complexGridSample(*input, *grid))
 }
 

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TorchSharp.NN;
 using TorchSharp.Tensor;
 using Warp;
 using Warp.NNModels;
@@ -274,9 +275,65 @@ namespace GANRecon
                 GPU.CopyDeviceToDevice(refVolume.GetDevice(Intent.Read), tensorRefVolume.DataPtr(), refVolume.ElementsReal);
                 TorchTensor tensorProjectionByAverage = tensorRefVolume.Mean(new long[] { 2 });
 
+
+
+
                 Image imageProjectionByAverage = new Image(new int3( boxLength, boxLength,1));
                 GPU.CopyDeviceToDevice(tensorProjectionByAverage.DataPtr(), imageProjectionByAverage.GetDevice(Intent.Write), imageProjectionByAverage.ElementsReal);
                 imageProjectionByAverage.WriteMRC(@$"{directory}\imageProjectionByAverage.mrc", true);
+
+
+
+
+
+                var torchProjector = TorchSharp.NN.Modules.Projector(tensorRefVolume, 1);
+
+                var data = torchProjector.GetData();
+
+                {
+                    Image imagefftSlice = new Image(new int3(boxLength, boxLength, boxLength), true);
+                    GPU.CopyDeviceToDevice(data.Abs().DataPtr(), imagefftSlice.GetDevice(Intent.Write), imagefftSlice.ElementsReal); ;
+                    imagefftSlice.WriteMRC(@$"{directory}\dataTorchOperatorFFTAbs.mrc", true);
+
+                    Image imagefftSliceReal = new Image(new int3(boxLength, boxLength, boxLength), true);
+                    GPU.CopyDeviceToDevice(data.Real().Clone().DataPtr(), imagefftSliceReal.GetDevice(Intent.Write), imagefftSliceReal.ElementsReal); ;
+
+                    Image imagefftSliceImag = new Image(new int3(boxLength, boxLength, boxLength), true);
+                    GPU.CopyDeviceToDevice(data.Imag().Clone().DataPtr(), imagefftSliceImag.GetDevice(Intent.Write), imagefftSliceImag.ElementsReal); ;
+                    Image.Stack(new Image[] { imagefftSliceReal, imagefftSliceImag }).WriteMRC(@$"{directory}\dataTorchOperatorFFTStacked.mrc", true);
+                }
+
+                var corrVolume = torchProjector.GetCorrectedVolume();
+
+                {
+                    Image imCorrVol = new Image(new int3(boxLength));
+                    GPU.CopyDeviceToDevice(corrVolume.DataPtr(), imCorrVol.GetDevice(Intent.Write), imCorrVol.ElementsReal);
+                    imCorrVol.WriteMRC(@$"{directory}\imCorrVol.mrc", true);
+                }
+
+                var projectedFFT = torchProjector.Project(Float32Tensor.Empty(new long[]{1,3 }));
+
+                {
+                    Image imagefftSlice = new Image(new int3(boxLength, boxLength, 1), true);
+                    GPU.CopyDeviceToDevice(projectedFFT.Abs().DataPtr(), imagefftSlice.GetDevice(Intent.Write), imagefftSlice.ElementsReal); ;
+                    imagefftSlice.WriteMRC(@$"{directory}\projectionTorchOperatorFFTAbs.mrc", true);
+
+                    Image imagefftSliceReal = new Image(new int3(boxLength, boxLength, 1), true);
+                    GPU.CopyDeviceToDevice(projectedFFT.Real().Clone().DataPtr(), imagefftSliceReal.GetDevice(Intent.Write), imagefftSliceReal.ElementsReal); ;
+
+                    Image imagefftSliceImag = new Image(new int3(boxLength, boxLength, 1), true);
+                    GPU.CopyDeviceToDevice(projectedFFT.Imag().Clone().DataPtr(), imagefftSliceImag.GetDevice(Intent.Write), imagefftSliceImag.ElementsReal); ;
+                    Image.Stack(new Image[] { imagefftSliceReal, imagefftSliceImag }).WriteMRC(@$"{directory}\projectionTorchOperatorFFTStacked.mrc", true);
+                }
+
+                var projected = projectedFFT.irfftn(new long[] { 3, 4 });
+                {
+                    Image projection = new Image(new int3(boxLength, boxLength, 1));
+                    GPU.CopyDeviceToDevice(projected.DataPtr(), projection.GetDevice(Intent.Write), projection.ElementsReal);
+                    projection.RemapFromFT();
+                    projection.WriteMRC(@$"{directory}\projectionTorchOperator.mrc", true);
+                }
+                
                 return;
                 
                 /*

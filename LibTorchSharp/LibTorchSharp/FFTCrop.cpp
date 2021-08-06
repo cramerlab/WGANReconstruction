@@ -85,7 +85,16 @@ torch::Tensor fftshift(const torch::Tensor& x, c10::optional<IntArrayRef> dim_op
     {
         shift[i] = x_sizes[dim[i]] / 2;
     }
+    std::vector<int64_t> shift_vec;
+    std::vector<int64_t> dim_vec;
+    std::vector<int64_t> x_sizes_vec;
+    for (size_t i = 0; i < dim.size(); i++)
+    {
+        shift_vec.emplace_back(shift[i]);
+        dim_vec.emplace_back(dim[i]);
+        x_sizes_vec.emplace_back(x_sizes[dim[i]]);
 
+    }
     return at::roll(x, shift, dim);
 }
 

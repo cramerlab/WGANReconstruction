@@ -22,6 +22,7 @@
     <ClCompile Include="LibTorchSharp\MultiGPUModule.cpp" />
     <ClCompile Include="LibTorchSharp\ParticleWGAN.cpp" />
     <ClCompile Include="LibTorchSharp\CustomOperatorsAutograd.cpp" />
+    <ClCompile Include="LibTorchSharp\Projector.cpp" />
     <ClCompile Include="LibTorchSharp\ResNet.cpp" />
     <ClCompile Include="LibTorchSharp\THSAutograd.cpp" />
     <ClCompile Include="LibTorchSharp\THSData.cpp" />
@@ -37,6 +38,7 @@
     <ClInclude Include="LibTorchSharp\cifar10.h" />
     <ClInclude Include="LibTorchSharp\ComplexGridSampler.h" />
     <ClInclude Include="LibTorchSharp\CustomModules.h" />
+    <ClInclude Include="LibTorchSharp\FFTCrop.h" />
     <ClInclude Include="LibTorchSharp\MultiGPUModule.h" />
     <ClInclude Include="LibTorchSharp\parallel.h" />
     <ClInclude Include="LibTorchSharp\CustomOperatorsAutograd.h" />

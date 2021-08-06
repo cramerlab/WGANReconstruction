@@ -119,14 +119,14 @@ torch::Tensor projectAtoms_autograd(const torch::Tensor& intensities, const torc
 
 //Complex grid Sample part
 
-torch::Tensor complexGridSample(const torch::Tensor& input, const torch::Tensor& grid, double max_r2) {
+torch::Tensor complexGridSample(const torch::Tensor& input, const torch::Tensor& grid) {
 	static auto op = torch::Dispatcher::singleton()
 		.findSchemaOrThrow("myops::complexGridSample", "")
 		.typed<decltype(complexGridSample)>();
 	// Make sure that we have expected dimensionality for the lower level function calls
 	//TORCH_CHECK(intensities.dim() == 2 && positions.dim() == 3 && orientation.dim() == 3 && shift.dim() == 2);
 	//TORCH_CHECK(intensities.size(0) == positions.size(0) && orientation.size(0) == positions.size(0) && shift.size(0) == positions.size(0));
-	return op.call(input, grid, max_r2);
+	return op.call(input, grid);
 }
 
 tensor_list complexGridSample_backwards(const torch::Tensor& grad_output, const torch::Tensor& input, const torch::Tensor& grid) {
@@ -140,11 +140,11 @@ class ComplexGridSample : public Function<ComplexGridSample>
 {
 public:
 	static torch::Tensor forward(
-		AutogradContext* ctx, torch::Tensor input, torch::Tensor grid, double max_r2) {
+		AutogradContext* ctx, torch::Tensor input, torch::Tensor grid) {
 		ctx->save_for_backward({ input, grid });
 
 		at::AutoNonVariableTypeMode g;
-		return complexGridSample(input, grid, max_r2);
+		return complexGridSample(input, grid);
 	}
 
 	static tensor_list backward(AutogradContext* ctx, tensor_list grad_outputs) {
@@ -154,55 +154,8 @@ public:
 	}
 };
 
-torch::Tensor complexGridSample_cuda(const torch::Tensor& input, const torch::Tensor& grid, double max_r2) {
-	/* {
-		std::cout << "x direction" << std::endl;
-		torch::Tensor toPrint = grid.to(torch::kCPU).index({ 0, 0, "...", 0 }).squeeze();
-		auto dim = toPrint.sizes().vec();
-		std::cout << std::endl;
-		for (int y = 0; y < dim[1]; y++)
-		{
-			for (int x = 0; x < dim[0]; x++)
-			{
-
-				std::cout << toPrint.index({ y, x }).item().todouble() << "\t";
-			}
-			std::cout << std::endl;
-		}
-	}
-
-	{
-		std::cout << "y direction" << std::endl;
-		torch::Tensor toPrint = grid.to(torch::kCPU).index({ 0, 0, "...", 1 }).squeeze();
-		auto dim = toPrint.sizes().vec();
-		std::cout << std::endl;
-		for (int y = 0; y < dim[1]; y++)
-		{
-			for (int x = 0; x < dim[0]; x++)
-			{
-
-				std::cout << toPrint.index({ y, x }).item().toFloat() << "\t";
-			}
-			std::cout << std::endl;
-		}
-	}
-
-	{
-		std::cout << "z direction" << std::endl;
-		torch::Tensor toPrint = grid.to(torch::kCPU).index({ 0, 0, "...", 2 }).squeeze();
-		auto dim = toPrint.sizes().vec();
-		std::cout << std::endl;
-		for (int y = 0; y < dim[1]; y++)
-		{
-			for (int x = 0; x < dim[0]; x++)
-			{
-
-				std::cout << toPrint.index({ y, x }).item().toFloat() << "\t";
-			}
-			std::cout << std::endl;
-		}
-	}*/
-
+torch::Tensor complexGridSample_cuda(const torch::Tensor& input, const torch::Tensor& grid) {
+	
 	TORCH_CHECK(input.dim() == 4 || input.dim() == 5)
 	if(input.dim() == 4)
 		return at::native::MyOperator::complex_grid_sampler_2d_cuda(input, grid, static_cast<int>(at::native::GridSamplerInterpolation::Bilinear), static_cast<int>(at::native::GridSamplerPadding::Zeros), true);
@@ -225,60 +178,13 @@ tensor_list complexGridSample_backwards_cuda(const torch::Tensor& grad_output, c
 }
 
 
-torch::Tensor complexGridSample_cpu(const torch::Tensor& input, const torch::Tensor& grid, double max_r2) {
-	/* {
-		std::cout << "x direction" << std::endl;
-		torch::Tensor toPrint = grid.to(torch::kCPU).index({ 0, 0, "...", 0 }).squeeze();
-		auto dim = toPrint.sizes().vec();
-		std::cout << std::endl;
-		for (int y = 0; y < dim[1]; y++)
-		{
-			for (int x = 0; x < dim[0]; x++)
-			{
-
-				std::cout << toPrint.index({ y, x }).item().toFloat() << "\t";
-			}
-			std::cout << std::endl;
-		}
-	}
-
-	{
-		std::cout << "y direction" << std::endl;
-		torch::Tensor toPrint = grid.to(torch::kCPU).index({ 0, 0, "...", 1 }).squeeze();
-		auto dim = toPrint.sizes().vec();
-		std::cout << std::endl;
-		for (int y = 0; y < dim[1]; y++)
-		{
-			for (int x = 0; x < dim[0]; x++)
-			{
-
-				std::cout << toPrint.index({ y, x }).item().toFloat() << "\t";
-			}
-			std::cout << std::endl;
-		}
-	}
-
-	{
-		std::cout << "z direction" << std::endl;
-		torch::Tensor toPrint = grid.to(torch::kCPU).index({ 0, 0, "...", 2 }).squeeze();
-		auto dim = toPrint.sizes().vec();
-		std::cout << std::endl;
-		for (int y = 0; y < dim[1]; y++)
-		{
-			for (int x = 0; x < dim[0]; x++)
-			{
-
-				std::cout << toPrint.index({ y, x }).item().toFloat() << "\t";
-			}
-			std::cout << std::endl;
-		}
-	}*/
-
+torch::Tensor complexGridSample_cpu(const torch::Tensor& input, const torch::Tensor& grid) {
+	
 	TORCH_CHECK(input.dim() == 4 || input.dim() == 5)
 		if (input.dim() == 4)
 			return at::native::ComplexGridSampler::complex_grid_sampler_cpu_2d(input, grid, static_cast<int>(at::native::GridSamplerInterpolation::Bilinear), static_cast<int>(at::native::GridSamplerPadding::Zeros), true);
 		else
-			return at::native::ComplexGridSampler::complex_grid_sampler_cpu_3d(input, grid, static_cast<int>(at::native::GridSamplerInterpolation::Bilinear), static_cast<int>(at::native::GridSamplerPadding::Zeros), true, max_r2);
+			return at::native::ComplexGridSampler::complex_grid_sampler_cpu_3d(input, grid, static_cast<int>(at::native::GridSamplerInterpolation::Bilinear), static_cast<int>(at::native::GridSamplerPadding::Zeros), true);
 }
 
 tensor_list complexGridSample_backwards_cpu(const torch::Tensor& grad_output, const torch::Tensor& input, const torch::Tensor& grid) {
@@ -296,8 +202,8 @@ tensor_list complexGridSample_backwards_cpu(const torch::Tensor& grad_output, co
 }
 
 
-torch::Tensor complexGridSample_autograd(const torch::Tensor& input, const torch::Tensor& grid, double max_r2) {
-	return ComplexGridSample::apply(input, grid, max_r2);
+torch::Tensor complexGridSample_autograd(const torch::Tensor& input, const torch::Tensor& grid) {
+	return ComplexGridSample::apply(input, grid);
 }
 
 

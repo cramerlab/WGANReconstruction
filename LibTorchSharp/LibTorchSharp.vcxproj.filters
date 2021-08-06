@@ -78,6 +78,9 @@
     <ClCompile Include="LibTorchSharp\ComplexGridSampler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="LibTorchSharp\Projector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LibTorchSharp\cifar10.h">
@@ -126,6 +129,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="LibTorchSharp\ComplexGridSampler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="LibTorchSharp\FFTCrop.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -14,7 +14,7 @@ torch::Tensor matrix_from_angles(torch::Tensor& angles)
     auto cs = cb * sa;
     auto sc = sb * ca;
     auto ss = sb * sa;
-    auto matrix = torch::empty((1, 3, 3), angles.options());
+    auto matrix = torch::empty((angles.size(0), 3, 3), angles.options());
     matrix.index_put_({ Slice(0, None), 0, 0 }, cg * cc - sg * sa);
     matrix.index_put_({ Slice(0, None), 0, 1 }, cg * cs + sg * ca);
     matrix.index_put_({ Slice(0, None), 0, 2 }, -cg * sb);
