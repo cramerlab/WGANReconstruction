@@ -24,7 +24,7 @@ namespace GANRecon
 
         static void Main(string[] args)
         {
-            int boxLength = 64;
+            int boxLength = 128;
             int2 boxsize = new(boxLength);
             int[] devices = { 1 };
             GPU.SetDevice(devices[0]);
@@ -36,6 +36,7 @@ namespace GANRecon
             //Read all particles and CTF information into memory
             {
                 var directory = @"D:\GANRecon";
+                var outdir = $@"{directory}\Optimization_noSigmoid_{boxLength}";
                 var refVolume = Image.FromFile(@"D:\GANRecon\run_1k_unfil.mrc");
                 var refMask = Image.FromFile(@"D:\GANRecon\mask_1k.mrc");
 
@@ -158,8 +159,8 @@ namespace GANRecon
                     //var gen = Modules.ReconstructionWGANGenerator(randVolume, boxLength, 10);
                     double learningRate = 1e-1;
                     //var optimizer = Optimizer.SGD(gen.GetParameters(), 1e-2, 0.0);
-                    if(! Directory.Exists($@"{directory}\Optimization"))
-                        Directory.CreateDirectory($@"{directory}\Optimization");
+                    if(! Directory.Exists($@"{outdir}"))
+                        Directory.CreateDirectory($@"{outdir}");
                     for (int epoch = startEpoch>0?startEpoch+1:0; epoch < numEpochs; epoch++)
                     {
                         float meanDiscLoss = 0.0f;
@@ -267,14 +268,14 @@ namespace GANRecon
                         losses.Append(meanDiscLoss / (count / batchSize));
                         GPU.DeviceSynchronize();
                         GPU.CheckGPUExceptions();
-                        using (StreamWriter file = new($@"{ directory }\Optimization_noSigmoid\log.txt", append: true))
+                        using (StreamWriter file = new($@"{ outdir }\log.txt", append: true))
                         {
                             file.WriteLineAsync($"Epoch {epoch}: Disc: { meanDiscLoss / discSteps } (r: {meanRealLoss / discSteps}, f: {meanFakeLoss / discSteps}) Gen: {meanGenLoss / genSteps}");
                         }
                         //Console.WriteLine($"Epoch {epoch}: Disc: { meanDiscLoss / discSteps } Gen: {meanGenLoss / genSteps}");
                         
                         if(epoch %50==0 || epoch == numEpochs-1)
-                            model.Save($@"{directory}\Optimization_noSigmoid\model_e{epoch}\model");
+                            model.Save($@"{outdir}\model_e{epoch}\model");
                     }
 
 
