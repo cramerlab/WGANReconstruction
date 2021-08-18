@@ -59,5 +59,15 @@ namespace TorchSharp.NN
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new AtomProjector(res, boxedHandle);
         }
+
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSNN_MatrixFromAngles(IntPtr angles);
+
+        static public TorchTensor MatrixFromAngles(TorchTensor angles)
+        {
+            var res = THSNN_MatrixFromAngles(angles.Handle);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
     }
 }

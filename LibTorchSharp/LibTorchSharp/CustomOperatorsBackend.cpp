@@ -1,5 +1,6 @@
 #include<torch/torch.h>
 #include "Utils.h"
+#include "CustomModules.h"
 using namespace torch::indexing;
 
 torch::Tensor matrix_from_angles(torch::Tensor& angles)
@@ -8,13 +9,17 @@ torch::Tensor matrix_from_angles(torch::Tensor& angles)
     auto cb = angles.index({ Slice(0, None), 1 }).cos();
     auto cg = angles.index({ Slice(0, None), 2 }).cos();
     auto sa = angles.index({ Slice(0, None), 0 }).sin();
-    auto sb = angles.index({ Slice(0, None), 0 }).sin();
-    auto sg = angles.index({ Slice(0, None), 0 }).sin();
+    auto sb = angles.index({ Slice(0, None), 1 }).sin();
+    auto sg = angles.index({ Slice(0, None), 2 }).sin();
     auto cc = cb * ca;
     auto cs = cb * sa;
     auto sc = sb * ca;
     auto ss = sb * sa;
-    auto matrix = torch::empty((angles.size(0), 3, 3), angles.options());
+
+    auto matDims = new int64_t[]{ angles.size(0), 3, 3 };
+    auto matrix = torch::empty(c10::IntArrayRef(matDims, 3), angles.options());
+    delete matDims;
+
     matrix.index_put_({ Slice(0, None), 0, 0 }, cg * cc - sg * sa);
     matrix.index_put_({ Slice(0, None), 0, 1 }, cg * cs + sg * ca);
     matrix.index_put_({ Slice(0, None), 0, 2 }, -cg * sb);
