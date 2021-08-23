@@ -84,6 +84,9 @@
     <ClCompile Include="LibTorchSharp\ReconstructionWGAN.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="LibTorchSharp\SpectralNormalization.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LibTorchSharp\cifar10.h">
@@ -135,6 +138,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="LibTorchSharp\FFTCrop.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="LibTorchSharp\SpectralNormalization.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

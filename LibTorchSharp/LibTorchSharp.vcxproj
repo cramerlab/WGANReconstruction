@@ -25,6 +25,7 @@
     <ClCompile Include="LibTorchSharp\Projector.cpp" />
     <ClCompile Include="LibTorchSharp\ReconstructionWGAN.cpp" />
     <ClCompile Include="LibTorchSharp\ResNet.cpp" />
+    <ClCompile Include="LibTorchSharp\SpectralNormalization.cpp" />
     <ClCompile Include="LibTorchSharp\THSAutograd.cpp" />
     <ClCompile Include="LibTorchSharp\THSData.cpp" />
     <ClCompile Include="LibTorchSharp\THSJIT.cpp" />
@@ -44,6 +45,7 @@
     <ClInclude Include="LibTorchSharp\parallel.h" />
     <ClInclude Include="LibTorchSharp\CustomOperatorsAutograd.h" />
     <ClInclude Include="LibTorchSharp\CustomOperatorsBackend.cuh" />
+    <ClInclude Include="LibTorchSharp\SpectralNormalization.h" />
     <ClInclude Include="LibTorchSharp\THSAutograd.h" />
     <ClInclude Include="LibTorchSharp\THSData.h" />
     <ClInclude Include="LibTorchSharp\THSJIT.h" />

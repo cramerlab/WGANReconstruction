@@ -36,7 +36,7 @@ namespace GANRecon
             //Read all particles and CTF information into memory
             {
                 var directory = @"D:\GANRecon";
-                var outdir = $@"{directory}\Optimization_noSigmoid_{boxLength}";
+                var outdir = $@"{directory}\Optimization_spectralNorm_{boxLength}";
                 var refVolume = Image.FromFile(@"D:\GANRecon\run_1k_unfil.mrc");
                 var refMask = Image.FromFile(@"D:\GANRecon\mask_1k.mrc");
 
@@ -75,7 +75,8 @@ namespace GANRecon
                 }
 
                 var model = new ReconstructionWGAN(new int2(boxLength), 10, devices, batchSize);
-                int startEpoch = 0;
+                model.getVolume();
+                int startEpoch = 150;
                 if (startEpoch > 0)
                 {
                     model.Load($@"{directory}\Optimization_noSigmoid\model_e{startEpoch}\model");
@@ -208,7 +209,7 @@ namespace GANRecon
                             TorchTensor loss = diffSqrd.Mean();
                             loss.Backward();*/
                             if (numBatch % discIters != 0) {
-                                model.TrainDiscriminatorParticle(source, null, (float)0.0001, (float)10, out Image prediction, out float[] wLoss, out float[] rLoss, out float[] fLoss);
+                                model.TrainDiscriminatorParticle(source, null, (float)0.0001, (float)2, out Image prediction, out float[] wLoss, out float[] rLoss, out float[] fLoss);
                                 GPU.CheckGPUExceptions();
                                 float discLoss = wLoss[0];
                                 meanDiscLoss += (float)discLoss;

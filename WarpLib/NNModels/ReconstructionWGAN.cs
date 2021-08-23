@@ -194,6 +194,7 @@ namespace Warp.NNModels
 
         public Image getVolume()
         {
+            var tensors = Generators[0].GetParameters();
             var tensorVolume = Generators[0].GetParameters()[0];
 
             var imageVolume = new Image(new int3(this.BoxDimensions.X));
@@ -462,10 +463,13 @@ namespace Warp.NNModels
 
 
                         using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(TensorTrueImages[i], PredictionMasked, penaltyLambda))
-                        using(TorchTensor added = LossFake+LossReal)
-                        using(TorchTensor wLoss = Penalty+ added)
+                        //using(TorchTensor added = LossFake+LossReal)
+                        //using(TorchTensor wLoss = Penalty+ added)
                         {
-                            wLoss.Backward();
+                            LossReal.Backward();
+                            LossFake.Backward();
+                            Penalty.Backward();
+                            //wLoss.Backward();
                         }
                     }
                 }

@@ -15,7 +15,7 @@
 #include <c10/util/Exception.h>
 
 #include "MultiGPUModule.h"
-
+#include "SpectralNormalization.h"
 extern torch::Tensor matrix_from_angles(torch::Tensor& angles);
 
 struct ReconstructionWGANResidualBlock : MultiGPUModule
@@ -300,37 +300,37 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
     {
         // Spatial
         {
-            Discriminator->push_back(torch::nn::Conv2d(torch::nn::Conv2dOptions(1, 64, 7).stride(1).padding(3)));              // 256
+            Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(1, 64, 7).stride(1).padding(3)));              // 256
             Discriminator->push_back(torch::nn::InstanceNorm2d(torch::nn::InstanceNorm2dOptions(64).affine(false)));
             Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.2)));
 
-            //Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
-            Discriminator->push_back(torch::nn::Conv2d(torch::nn::Conv2dOptions(64, 128, 3).stride(2).padding(1)));            // 128
+            Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
+            Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(64, 128, 3).stride(2).padding(1)));            // 128
             Discriminator->push_back(torch::nn::InstanceNorm2d(torch::nn::InstanceNorm2dOptions(128).affine(false)));
             Discriminator->push_back(ReconstructionWGANResidualBlockInstanceNorm(128, true));
 
             //Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
-            Discriminator->push_back(torch::nn::Conv2d(torch::nn::Conv2dOptions(128, 256, 3).stride(2).padding(1)));           // 64
+            Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(128, 256, 3).stride(2).padding(1)));           // 64
             Discriminator->push_back(torch::nn::InstanceNorm2d(torch::nn::InstanceNorm2dOptions(256).affine(false)));
             Discriminator->push_back(ReconstructionWGANResidualBlockInstanceNorm(256, true));
 
             //Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
-            Discriminator->push_back(torch::nn::Conv2d(torch::nn::Conv2dOptions(256, 512, 3).stride(2).padding(1)));          // 32
+            Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(256, 512, 3).stride(2).padding(1)));          // 32
             Discriminator->push_back(torch::nn::InstanceNorm2d(torch::nn::InstanceNorm2dOptions(512).affine(false)));
             Discriminator->push_back(ReconstructionWGANResidualBlockInstanceNorm(512, true));
 
             //Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
-            Discriminator->push_back(torch::nn::Conv2d(torch::nn::Conv2dOptions(512, 1024, 3).stride(2).padding(1)));          // 16
+            Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(512, 1024, 3).stride(2).padding(1)));          // 16
             //Discriminator->push_back(torch::nn::InstanceNorm2d(torch::nn::InstanceNorm2dOptions(1024).affine(false)));
             Discriminator->push_back(ReconstructionWGANResidualBlockInstanceNorm(1024, false));
 
-            Discriminator->push_back(torch::nn::Conv2d(torch::nn::Conv2dOptions(1024, 2048, 4).stride(1).padding(0)));          // 16
+            Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(1024, 2048, 4).stride(1).padding(0)));          // 16
             //Discriminator->push_back(torch::nn::InstanceNorm2d(torch::nn::InstanceNorm2dOptions(1024).affine(false)));
 
             //Discriminator->push_back(torch::nn::AdaptiveAvgPool2d(torch::nn::AdaptiveAvgPool2dOptions({ 1, 1 })));
 
             Discriminator->push_back(torch::nn::Flatten());
-
+            
             Discriminator->push_back(torch::nn::Linear(torch::nn::LinearOptions(2048 * 1 * 1, 256)));
             Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.0)));
             Discriminator->push_back(torch::nn::Linear(torch::nn::LinearOptions(256, 64)));
@@ -401,7 +401,6 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
         //decisions.push_back(Discriminator->forward(image.rot90(1, { 2, 3 }))/*.unsqueeze(1)*/);
         //decisions.push_back(Discriminator->forward(image.rot90(2, { 2, 3 }))/*.unsqueeze(1)*/);
         //decisions.push_back(Discriminator->forward(image.rot90(3, { 2, 3 }))/*.unsqueeze(1)*/);
-
         torch::Tensor decision_spatial = DiscriminatorPooled->forward(/*std::get<0>(*/torch::cat(decisions, 1)/*.max(1))*/);
 
         //x = x.squeeze(3);
