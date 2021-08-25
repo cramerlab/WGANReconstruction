@@ -312,23 +312,23 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
         //crap = crap.view({ -1, 64, 32, 32 });
         //crap = CrapDecoder->forward(crap);*/
 
-        torch::Tensor noise_add = torch::randn(fakeimages.sizes(), fakeimages.options());
-        //noise_add = noise_add.add(crap);
-        noise_add = ProcessorAdd->forward(noise_add);
-        noise_add = torch::fft::rfftn(noise_add, c10::nullopt, std::vector<int64_t>({ 2, 3 }), "forward");
-        noise_add = noise_add.mul(ctf);
-        noise_add = torch::fft::irfftn(noise_add, c10::nullopt, std::vector<int64_t>({ 2, 3 }), "forward");
+        //torch::Tensor noise_add = torch::randn(fakeimages.sizes(), fakeimages.options());
+        ////noise_add = noise_add.add(crap);
+        //noise_add = ProcessorAdd->forward(noise_add);
+        //noise_add = torch::fft::rfftn(noise_add, c10::nullopt, std::vector<int64_t>({ 2, 3 }), "forward");
+        //noise_add = noise_add.mul(ctf);
+        //noise_add = torch::fft::irfftn(noise_add, c10::nullopt, std::vector<int64_t>({ 2, 3 }), "forward");
 
-        torch::Tensor noise_mul = torch::randn(fakeimages.sizes(), fakeimages.options());
-        noise_mul = ProcessorMul->forward(noise_mul);
+        //torch::Tensor noise_mul = torch::randn(fakeimages.sizes(), fakeimages.options());
+        //noise_mul = ProcessorMul->forward(noise_mul);
 
-        torch::Tensor allnoise = noise_add + noise_mul;
-        torch::Tensor noisestd = torch::std(allnoise.flatten(1, 3), 1, true, true).unsqueeze(2).unsqueeze(3);
-        torch::Tensor noisemean = torch::mean(allnoise.flatten(1, 3), 1, true).unsqueeze(2).unsqueeze(3);
-        allnoise = (allnoise - noisemean) / (noisestd + 1e-4f);
+        //torch::Tensor allnoise = noise_add + noise_mul;
+        //torch::Tensor noisestd = torch::std(allnoise.flatten(1, 3), 1, true, true).unsqueeze(2).unsqueeze(3);
+        //torch::Tensor noisemean = torch::mean(allnoise.flatten(1, 3), 1, true).unsqueeze(2).unsqueeze(3);
+        //allnoise = (allnoise - noisemean) / (noisestd + 1e-4f);
 
-        //fakeimages = ProcessorImage->forward(fakeimages);
-        fakeimages = fakeimages.add(allnoise);
+        ////fakeimages = ProcessorImage->forward(fakeimages);
+        //fakeimages = fakeimages.add(allnoise);
 
         return fakeimages;
     }
@@ -362,10 +362,11 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
             else
                 Discriminator->push_back(torch::nn::Conv2d(torch::nn::Conv2dOptions(64, 128, 3).stride(2).padding(1)));            // 128
             Discriminator->push_back(torch::nn::InstanceNorm2d(torch::nn::InstanceNorm2dOptions(128).affine(false)));
-            if(sn)
-                Discriminator->push_back(ReconstructionWGANResidualBlockSPNormInstanceNorm(128, true));
-            else
-                Discriminator->push_back(ReconstructionWGANResidualBlockInstanceNorm(128, true));
+            
+            //if(sn)
+            //    Discriminator->push_back(ReconstructionWGANResidualBlockSPNormInstanceNorm(128, true));
+            //else
+            //    Discriminator->push_back(ReconstructionWGANResidualBlockInstanceNorm(128, true));
 
             //Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
             if (sn)
@@ -373,10 +374,10 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
             else
                 Discriminator->push_back(torch::nn::Conv2d(torch::nn::Conv2dOptions(128, 256, 3).stride(2).padding(1)));           // 64
             Discriminator->push_back(torch::nn::InstanceNorm2d(torch::nn::InstanceNorm2dOptions(256).affine(false)));
-            if (sn)
-                Discriminator->push_back(ReconstructionWGANResidualBlockSPNormInstanceNorm(256, true));
-            else
-                Discriminator->push_back(ReconstructionWGANResidualBlockInstanceNorm(256, true));
+            //if (sn)
+            //    Discriminator->push_back(ReconstructionWGANResidualBlockSPNormInstanceNorm(256, true));
+            //else
+            //    Discriminator->push_back(ReconstructionWGANResidualBlockInstanceNorm(256, true));
 
             //Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
             if(sn)
@@ -384,10 +385,10 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
             else
                 Discriminator->push_back(torch::nn::Conv2d(torch::nn::Conv2dOptions(256, 512, 3).stride(2).padding(1)));          // 32
             Discriminator->push_back(torch::nn::InstanceNorm2d(torch::nn::InstanceNorm2dOptions(512).affine(false)));
-            if (sn)
-                Discriminator->push_back(ReconstructionWGANResidualBlockSPNormInstanceNorm(512, true));
-            else
-                Discriminator->push_back(ReconstructionWGANResidualBlockInstanceNorm(512, true));
+            //if (sn)
+            //    Discriminator->push_back(ReconstructionWGANResidualBlockSPNormInstanceNorm(512, true));
+            //else
+            //    Discriminator->push_back(ReconstructionWGANResidualBlockInstanceNorm(512, true));
 
             //Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
             
@@ -396,10 +397,10 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
             else
                 Discriminator->push_back(torch::nn::Conv2d(torch::nn::Conv2dOptions(512, 1024, 3).stride(2).padding(1)));          // 16
             //Discriminator->push_back(torch::nn::InstanceNorm2d(torch::nn::InstanceNorm2dOptions(1024).affine(false)));
-            if (sn)
-                Discriminator->push_back(ReconstructionWGANResidualBlockSPNormInstanceNorm(1024, true));
-            else
-                Discriminator->push_back(ReconstructionWGANResidualBlockInstanceNorm(1024, false));
+            //if (sn)
+            //    Discriminator->push_back(ReconstructionWGANResidualBlockSPNormInstanceNorm(1024, true));
+            //else
+            //    Discriminator->push_back(ReconstructionWGANResidualBlockInstanceNorm(1024, false));
 
             if(sn)
                 Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(1024, 2048, 4).stride(1).padding(0)));          // 16

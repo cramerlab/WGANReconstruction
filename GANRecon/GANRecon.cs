@@ -24,7 +24,8 @@ namespace GANRecon
 
         static void Main(string[] args)
         {
-            int boxLength = 128;
+            int boxLength = 64;
+            int originalLength = -1;
             int2 boxsize = new(boxLength);
             int[] devices = { 1 };
             GPU.SetDevice(devices[0]);
@@ -36,8 +37,9 @@ namespace GANRecon
             //Read all particles and CTF information into memory
             {
                 var directory = @"D:\GANRecon";
-                var outdir = $@"{directory}\Optimization_spectralNorm_{boxLength}";
+                var outdir = $@"{directory}\Optimization_RealData_spectralNorm_{boxLength}";
                 var refVolume = Image.FromFile(@"D:\GANRecon\run_1k_unfil.mrc");
+                originalLength = refVolume.Dims.X;
                 var refMask = Image.FromFile(@"D:\GANRecon\mask_1k.mrc");
 
                 refVolume.Multiply(refMask);
@@ -66,20 +68,21 @@ namespace GANRecon
                 TorchTensor tensorRefVolume = TensorExtensionMethods.ToTorchTensor(refVolume.GetHostContinuousCopy(), new long[] { 1, 1, boxLength, boxLength, boxLength }).ToDevice(TorchSharp.DeviceType.CUDA);
 
                 TorchTensor tensorMaskSlice = TensorExtensionMethods.ToTorchTensor(mask2, new long[] { 1, 1, boxLength, boxLength }).ToDevice(TorchSharp.DeviceType.CUDA);
-
+                Image imageMaskSlice = new Image(new int3(boxLength, boxLength, 1));
+                GPU.CopyDeviceToDevice(tensorMaskSlice.DataPtr(), imageMaskSlice.GetDevice(Intent.Write), imageMaskSlice.ElementsReal);
                 {
-                    Image mask = new Image(new int3(boxLength, boxLength, 1));
-                    GPU.CopyDeviceToDevice(tensorMaskSlice.DataPtr(), mask.GetDevice(Intent.Write), mask.ElementsReal);
-                    mask.WriteMRC($@"{directory}\mask.mrc", true);
+
+
+                    imageMaskSlice.WriteMRC($@"{outdir}\imageMaskSlice.mrc", true);
 
                 }
 
                 var model = new ReconstructionWGAN(new int2(boxLength), 10, devices, batchSize);
                 model.getVolume();
-                int startEpoch = 150;
+                int startEpoch = 0;
                 if (startEpoch > 0)
                 {
-                    model.Load($@"{directory}\Optimization_noSigmoid\model_e{startEpoch}\model");
+                    model.Load($@"{outdir}\model_e{startEpoch}\model");
                 }
                 /*
                 float3[] angles = Helper.ArrayOfFunction(i => new float3(0, (float)(i * 10.0 / 180.0 * Math.PI), 0), 10);
@@ -142,17 +145,26 @@ namespace GANRecon
                             SubsetOffsets[j] = offsets[i];
                             SubsetCTFs[j] = Ctfs[i];
                             SubsetParticles[j] = stacksByPath[particlePaths[i].Item1].AsSliceXY(particlePaths[i].Item2);
+                            SubsetParticles[j].MultiplySlices(imageMaskSlice);
+                            SubsetParticles[j].ShiftSlices(new float3[] { offsets[i] * ((float)originalLength) / boxLength });
                             j++;
                         }
                     }
 
                     Projector proj = new Projector(refVolume, 2);
-                    Image CTFCoords = CTF.GetCTFCoords(boxLength*2, boxLength * 2);
+                    Image CTFCoords = CTF.GetCTFCoords(boxLength, originalLength);
                     Random rnd = new Random();
                     Image[] SubsetCleanParticles = Helper.ArrayOfFunction(i =>
                     {
                         Image im = proj.ProjectToRealspace(boxsize, new float3[] { SubsetAngles[i] });
                         im.Normalize();
+                        im.FreeDevice();
+                        return im;
+                    }, count);
+                    Image[] SubsetCtfs = Helper.ArrayOfFunction(i =>
+                    {
+                        Image im = new(new int3(boxLength, boxLength, 1), true);
+                        GPU.CreateCTF(im.GetDevice(Intent.Write), CTFCoords.GetDevice(Intent.Read), IntPtr.Zero, (uint)CTFCoords.ElementsSliceComplex, new CTFStruct[] { SubsetCTFs[i].ToStruct() }, false, 1);
                         im.FreeDevice();
                         return im;
                     }, count);
@@ -198,7 +210,9 @@ namespace GANRecon
                             //TorchTensor tensorAngles = TensorExtensionMethods.ToTorchTensor<float>(Helper.ToInterleaved(BatchAngles), new long[] { batchSize, 3 }).ToDevice(TorchSharp.DeviceType.CUDA);
                             //TorchTensor tensorRotMatrix = Modules.MatrixFromAngles(tensorAngles);
                             //TorchTensor projFake = gen.ForwardParticle(Float32Tensor.Empty(new long[] { 1 }), tensorAngles, true, 0);
-                            Image source = Image.Stack(Helper.ArrayOfFunction(i => SubsetCleanParticles[thisBatch[i]], batchSize));
+                            Image source = Image.Stack(Helper.ArrayOfFunction(i => SubsetParticles[thisBatch[i]], batchSize));
+                            Image sourceCTF = Image.Stack(Helper.ArrayOfFunction(i => SubsetCtfs[thisBatch[i]], batchSize));
+
                             //source.Normalize();
                             /*TorchTensor projReal = Float32Tensor.Empty(new long[] { batchSize, 1, boxLength, boxLength }, TorchSharp.DeviceType.CUDA);
                             GPU.CopyDeviceToDevice(source.GetDevice(Intent.Read), projReal.DataPtr(), source.ElementsReal);
@@ -209,27 +223,29 @@ namespace GANRecon
                             TorchTensor loss = diffSqrd.Mean();
                             loss.Backward();*/
                             if (numBatch % discIters != 0) {
-                                model.TrainDiscriminatorParticle(source, null, (float)0.0001, (float)2, out Image prediction, out float[] wLoss, out float[] rLoss, out float[] fLoss);
+                                model.TrainDiscriminatorParticle(source, sourceCTF, (float)0.0001, (float)2, out Image prediction, out float[] wLoss, out float[] rLoss, out float[] fLoss);
                                 GPU.CheckGPUExceptions();
                                 float discLoss = wLoss[0];
                                 meanDiscLoss += (float)discLoss;
                                 meanRealLoss += (float)rLoss[0];
                                 meanFakeLoss += (float)fLoss[0];
                                 discSteps++;
+                                //prediction.WriteMRC($@"{outdir}\prediction_{epoch}_{numBatch}.mrc", true);
                                 prediction.Dispose();
                             }
                             else
                             {
-                                model.TrainGeneratorParticle(null, (float)0.0001, out Image prediction, out Image predictionNoisy, out float[] genLoss);
+                                model.TrainGeneratorParticle(sourceCTF, (float)0.0001, out Image prediction, out Image predictionNoisy, out float[] genLoss);
                                 GPU.CheckGPUExceptions();
                                 meanGenLoss += genLoss[0];
                                 genSteps++;
                                 prediction.Dispose();
                             }
                             //prediction.WriteMRC($@"{directory}\Optimization\prediction_{epoch}_{numBatch}.mrc", true);
-                            //source.WriteMRC($@"{directory}\Optimization\source_{epoch}_{numBatch}.mrc", true);
+                            //source.WriteMRC($@"{outdir}\source_{epoch}_{numBatch}.mrc", true);
+                            //sourceCTF.WriteMRC($@"{outdir}\sourceCTF_{epoch}_{numBatch}.mrc", true);
                             //optimizer.Step();
-                            
+
 
 
                             /*if (numBatch == 0)
