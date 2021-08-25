@@ -37,7 +37,13 @@ namespace GANRecon
             //Read all particles and CTF information into memory
             {
                 var directory = @"D:\GANRecon";
-                var outdir = $@"{directory}\Optimization_RealData_spectralNorm_{boxLength}";
+                var outdir = $@"{directory}\Debug_{boxLength}";
+
+                if (!Directory.Exists(outdir))
+                {
+                    Directory.CreateDirectory(outdir);
+                }
+
                 var refVolume = Image.FromFile(@"D:\GANRecon\run_1k_unfil.mrc");
                 originalLength = refVolume.Dims.X;
                 var refMask = Image.FromFile(@"D:\GANRecon\mask_1k.mrc");

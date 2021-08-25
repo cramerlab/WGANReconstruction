@@ -462,13 +462,13 @@ namespace Warp.NNModels
 
 
 
-                        //using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(TensorTrueImages[i], PredictionMasked, penaltyLambda))
+                        using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(TensorTrueImages[i], PredictionMasked, penaltyLambda))
                         //using(TorchTensor added = LossFake+LossReal)
                         //using(TorchTensor wLoss = Penalty+ added)
                         {
                             LossReal.Backward();
                             LossFake.Backward();
-                            //Penalty.Backward();
+                            Penalty.Backward();
                             //wLoss.Backward();
                         }
                     }

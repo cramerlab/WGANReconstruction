@@ -53,8 +53,8 @@ namespace ParticleWGANDev
         private double LowPass = 1.0;
 
         private int BatchSize = 16;
-        float Lambda = 10f;
-        int DiscIters = 5;
+        float Lambda = 0.6f;
+        int DiscIters = 4;
         bool TrainGen = true;
 
         int NThreads = 3;
@@ -359,10 +359,10 @@ namespace ParticleWGANDev
 
             Task.Run(() =>
             {
-                WriteToLog("Loading model... (" + GPU.GetFreeMemory(0) + " MB free)");
+                WriteToLog("Loading model... (" + GPU.GetFreeMemory(1) + " MB free)");
                 //ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 32, new[] { 1 }, BatchSize);
                 ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), 10, new[] { 1 }, BatchSize);
-                WriteToLog("Done. (" + GPU.GetFreeMemory(0) + " MB free)");
+                WriteToLog("Done. (" + GPU.GetFreeMemory(1) + " MB free)");
 
                 GPU.SetDevice(ProcessingDevice);
 
@@ -478,6 +478,13 @@ namespace ParticleWGANDev
                                 //TImagesReal[iterTrain] = refProjector.ProjectToRealspace(new int2(Dim), Helper.ArrayOfFunction(i => 
                                 //        new float3((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble()) * ((float)Math.PI * 2), BatchSize));
 
+                                TImagesCTF[iterTrain].Multiply(TImagesCTF[iterTrain]);
+                                Image fft = TImagesReal[iterTrain].AsFFT();
+                                TImagesReal[iterTrain].Dispose();
+                                fft.Multiply(TImagesCTF[iterTrain]);
+                                TImagesReal[iterTrain] = fft.AsIFFT();
+                                fft.Dispose();
+
                                 GPU.NormParticles(TImagesReal[iterTrain].GetDevice(Intent.Read),
                                                   TImagesReal[iterTrain].GetDevice(Intent.Write),
                                                   TImagesReal[iterTrain].Dims.Slice(),
@@ -493,12 +500,7 @@ namespace ParticleWGANDev
                                               Helper.IndexedSubset(AllParticleCTF, SubsetIDs).Select(c => c.ToStruct()).ToArray(),
                                               false,
                                               (uint)BatchSize);
-                                TImagesCTF[iterTrain].Multiply(TImagesCTF[iterTrain]);
-                                Image fft = TImagesReal[iterTrain].AsFFT();
-                                TImagesReal[iterTrain].Dispose();
-                                fft.Multiply(TImagesCTF[iterTrain]);
-                                TImagesReal[iterTrain] = fft.AsIFFT();
-                                fft.Dispose();
+
                                 TImagesReal[iterTrain].Bandpass(0, (float)LowPass, false, 0.05f);
                                 TImagesReal[iterTrain].MaskSpherically(Dim / 2, Dim / 8, false);
 
