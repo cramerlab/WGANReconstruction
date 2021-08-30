@@ -45,6 +45,7 @@ namespace Warp.NNModels
         private TorchTensor[] TensorMask;
 
         private Optimizer OptimizerGen;
+        private Optimizer OptimizerGenVolume;
         private Optimizer OptimizerDisc;
 
         private Image ResultPredicted;
@@ -55,7 +56,10 @@ namespace Warp.NNModels
 
         private bool IsDisposed = false;
 
-        private double GenBoost = 10;
+        private double GenVolumeBoost = 10;
+        private double GenBoost = 1;
+
+        private double lambdaOutsideMask = 10;
 
         public ReconstructionWGAN(int2 boxDimensions, int codeLength, int[] devices, int batchSize = 8, Image initialVolume = null)
         {
@@ -132,7 +136,8 @@ namespace Warp.NNModels
                 }
             }, null);
 
-            OptimizerGen = Optimizer.Adam(Generators[0].GetParameters(), 0.01, 1e-4);
+            OptimizerGenVolume = Optimizer.Adam(Generators[0].GetParameters().Take(1), 0.01, 1e-4);
+            OptimizerGen = Optimizer.Adam(Generators[0].GetParameters().Skip(1), 0.01, 1e-4);
             OptimizerDisc = Optimizer.Adam(Discriminators[0].GetParameters(), 0.01, 1e-4);
 
             ResultPredicted = new Image(IntPtr.Zero, new int3(BoxDimensions.X, BoxDimensions.Y, BatchSize));
@@ -250,6 +255,7 @@ namespace Warp.NNModels
             GatherGrads();
 
             OptimizerGen.Step();
+            OptimizerGenVolume.Step();
 
             prediction = ResultPredicted;
             loss = ResultLoss;
@@ -348,6 +354,7 @@ namespace Warp.NNModels
                                            out float[] loss)
         {
             OptimizerGen.SetLearningRateAdam(learningRate * GenBoost);
+            OptimizerGenVolume.SetLearningRateAdam(learningRate * GenVolumeBoost);
             OptimizerGen.ZeroGrad();
 
             SyncParams();
@@ -368,8 +375,8 @@ namespace Warp.NNModels
                 TensorCrapCode[i].RandomNInPlace(TensorCrapCode[i].Shape);
                 GPU.CopyHostToDevice(angles, TensorAngles[i].DataPtr(), DeviceBatch*3);
 
-                //TensorAngles[i].RandomNInPlace(TensorAngles[i].Shape);
-                //TensorAngles[i] *= 2 * Math.PI;
+                TensorAngles[i].RandomNInPlace(TensorAngles[i].Shape);
+                TensorAngles[i] *= 2 * Math.PI;
                 using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, 0.5 * (2f / BoxDimensions.X)))
                 using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
                 using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
@@ -395,12 +402,21 @@ namespace Warp.NNModels
 
                     Loss.Backward(TensorOne[i]);
                 }
+
+                using (TorchTensor thisVolume = Generators[i].GetParameters()[0])
+                using (TorchTensor maskInv = (-1) * TensorMask[i] + 1)
+                using (TorchTensor penalty = (thisVolume * maskInv * lambdaOutsideMask).Mean())
+                {
+                    penalty.Backward();
+                }
+
             }, null);
+            
 
             GatherGrads();
 
             OptimizerGen.Step();
-
+            OptimizerGenVolume.Step();
             prediction = ResultPredicted;
             predictionNoisy = ResultPredictedNoisy;
             loss = ResultLoss;

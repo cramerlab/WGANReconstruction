@@ -297,37 +297,36 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
         torch::Tensor volumeRot = torch::nn::functional::grid_sample(_volume.size(0) < angles.size(0) ? _volume.expand(c10::IntArrayRef(new int64_t[]{angles.size(0), -1, -1, -1, -1}, 5)) : _volume,
             trans_grid, torch::nn::functional::GridSampleFuncOptions().padding_mode(torch::kZeros).align_corners(true));
 
-        auto proj = volumeRot.mean(2);
-        auto projDims = proj.sizes().vec();
-        torch::Tensor projstd = torch::std(proj.flatten(1, 3), 1, true, true).unsqueeze(2).unsqueeze(3);
-        torch::Tensor projmean = torch::mean(proj.flatten(1, 3), 1, true).unsqueeze(2).unsqueeze(3);
+        auto proj = volumeRot.sum(2);
+        //torch::Tensor projstd = torch::std(proj.flatten(1, 3), 1, true, true).unsqueeze(2).unsqueeze(3);
+        //torch::Tensor projmean = torch::mean(proj.flatten(1, 3), 1, true).unsqueeze(2).unsqueeze(3);
 
-        return (proj-projmean)/(projstd + 1e-4f);
+        return proj;
     }
 
     torch::Tensor forward(torch::Tensor crapcode, torch::Tensor fakeimages, torch::Tensor ctf)
     {
-        ///*torch::Tensor crap = CrapDecoder0->forward(crapcode);
-        //crap = crap.view({ -1, 64, 32, 32 });
-        //crap = CrapDecoder->forward(crap);*/
+        /*torch::Tensor crap = CrapDecoder0->forward(crapcode);
+        crap = crap.view({ -1, 64, 32, 32 });
+        crap = CrapDecoder->forward(crap);*/
 
-        //torch::Tensor noise_add = torch::randn(fakeimages.sizes(), fakeimages.options());
-        ////noise_add = noise_add.add(crap);
-        //noise_add = ProcessorAdd->forward(noise_add);
-        //noise_add = torch::fft::rfftn(noise_add, c10::nullopt, std::vector<int64_t>({ 2, 3 }), "forward");
-        //noise_add = noise_add.mul(ctf);
-        //noise_add = torch::fft::irfftn(noise_add, c10::nullopt, std::vector<int64_t>({ 2, 3 }), "forward");
+        torch::Tensor noise_add = torch::randn(fakeimages.sizes(), fakeimages.options());
+        //noise_add = noise_add.add(crap);
+        noise_add = ProcessorAdd->forward(noise_add);
+        noise_add = torch::fft::rfftn(noise_add, c10::nullopt, std::vector<int64_t>({ 2, 3 }), "forward");
+        noise_add = noise_add.mul(ctf);
+        noise_add = torch::fft::irfftn(noise_add, c10::nullopt, std::vector<int64_t>({ 2, 3 }), "forward");
 
-        //torch::Tensor noise_mul = torch::randn(fakeimages.sizes(), fakeimages.options());
-        //noise_mul = ProcessorMul->forward(noise_mul);
+        torch::Tensor noise_mul = torch::randn(fakeimages.sizes(), fakeimages.options());
+        noise_mul = ProcessorMul->forward(noise_mul);
 
-        //torch::Tensor allnoise = noise_add + noise_mul;
-        //torch::Tensor noisestd = torch::std(allnoise.flatten(1, 3), 1, true, true).unsqueeze(2).unsqueeze(3);
-        //torch::Tensor noisemean = torch::mean(allnoise.flatten(1, 3), 1, true).unsqueeze(2).unsqueeze(3);
-        //allnoise = (allnoise - noisemean) / (noisestd + 1e-4f);
+        torch::Tensor allnoise = noise_add + noise_mul;
+        torch::Tensor noisestd = torch::std(allnoise.flatten(1, 3), 1, true, true).unsqueeze(2).unsqueeze(3);
+        torch::Tensor noisemean = torch::mean(allnoise.flatten(1, 3), 1, true).unsqueeze(2).unsqueeze(3);
+        allnoise = (allnoise - noisemean) / (noisestd + 1e-4f);
 
-        ////fakeimages = ProcessorImage->forward(fakeimages);
-        //fakeimages = fakeimages.add(allnoise);
+        //fakeimages = ProcessorImage->forward(fakeimages);
+        fakeimages = fakeimages.add(allnoise);
 
         return fakeimages;
     }

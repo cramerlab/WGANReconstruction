@@ -368,6 +368,7 @@ namespace ParticleWGANDev
                 //ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 32, new[] { 1 }, BatchSize);
                 Image refVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
                 ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), 10, new[] { 1 }, BatchSize);
+                TrainModel.Load(@"D:\GANRecon\ParticleWGAN_SN_20210830_161014.pt");
                 WriteToLog("Done. (" + GPU.GetFreeMemory(1) + " MB free)");
 
                 GPU.SetDevice(ProcessingDevice);
@@ -453,46 +454,46 @@ namespace ParticleWGANDev
                                 int[] SubsetIDs = Helper.RandomSubset(AllIDs, BatchSize, ReloadRand.Next());
 
 
-                                //// Read, and copy or rescale real and fake images from prepared stacks
-                                //float[][] LoadStackData = LoadStack.GetHost(Intent.Write);
+                                // Read, and copy or rescale real and fake images from prepared stacks
+                                float[][] LoadStackData = LoadStack.GetHost(Intent.Write);
 
-                                //for (int b = 0; b < BatchSize; b++)
-                                //{
-                                //    int id = SubsetIDs[b];
-                                //    IOHelper.ReadMapFloat(Path.Combine(WorkingDirectory, DirectoryReal, AllParticleAddresses[id].name),
-                                //                            new int2(1),
-                                //                            0,
-                                //                            typeof(float),
-                                //                            new[] { AllParticleAddresses[id].id },
-                                //                            null,
-                                //                            new[] { LoadStackData[b] });
-                                //}
+                                for (int b = 0; b < BatchSize; b++)
+                                {
+                                    int id = SubsetIDs[b];
+                                    IOHelper.ReadMapFloat(Path.Combine(WorkingDirectory, DirectoryReal, AllParticleAddresses[id].name),
+                                                            new int2(1),
+                                                            0,
+                                                            typeof(float),
+                                                            new[] { AllParticleAddresses[id].id },
+                                                            null,
+                                                            new[] { LoadStackData[b] });
+                                }
 
-                                //if (Dim == DimRaw)
-                                //    GPU.CopyDeviceToDevice(LoadStack.GetDevice(Intent.Read),
-                                //                            TImagesReal[iterTrain].GetDevice(Intent.Write),
-                                //                            LoadStack.ElementsReal);
-                                //else
-                                //    GPU.Scale(LoadStack.GetDevice(Intent.Read),
-                                //                TImagesReal[iterTrain].GetDevice(Intent.Write),
-                                //                LoadStack.Dims.Slice(),
-                                //                TImagesReal[iterTrain].Dims.Slice(),
-                                //                (uint)BatchSize,
-                                //                PlanForw,
-                                //                PlanBack,
-                                //                IntPtr.Zero,
-                                //                IntPtr.Zero);
+                                if (Dim == DimRaw)
+                                    GPU.CopyDeviceToDevice(LoadStack.GetDevice(Intent.Read),
+                                                            TImagesReal[iterTrain].GetDevice(Intent.Write),
+                                                            LoadStack.ElementsReal);
+                                else
+                                    GPU.Scale(LoadStack.GetDevice(Intent.Read),
+                                                TImagesReal[iterTrain].GetDevice(Intent.Write),
+                                                LoadStack.Dims.Slice(),
+                                                TImagesReal[iterTrain].Dims.Slice(),
+                                                (uint)BatchSize,
+                                                PlanForw,
+                                                PlanBack,
+                                                IntPtr.Zero,
+                                                IntPtr.Zero);
                                 //TensorAngles.RandomNInPlace(TensorAngles.Shape);
                                 //TensorAngles *= 2 * Math.PI;
 
                                 float3[] theseAngles = Helper.IndexedSubset(AllParticleAngles, SubsetIDs);
                                 TImagesAngles[iterTrain] = Helper.ToInterleaved(theseAngles);
                                 GPU.CopyHostToDevice(TImagesAngles[iterTrain], TensorAngles.DataPtr(), TImagesAngles[iterTrain].Length);
-                                using (var projected = gen.ForwardParticle(Float32Tensor.Zeros(new long[] { 1 }), TensorAngles, false, 0.0d)) 
-                                {
-                                    GPU.CopyDeviceToDevice(projected.DataPtr(), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
-                                    //TImagesReal[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_TImagesReal[{iterTrain}]_afterProj.mrc", true);
-                                }
+                                //using (var projected = gen.ForwardParticle(Float32Tensor.Zeros(new long[] { 1 }), TensorAngles, false, 0.0d)) 
+                                //{
+                                //    GPU.CopyDeviceToDevice(projected.DataPtr(), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
+                                //    //TImagesReal[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_TImagesReal[{iterTrain}]_afterProj.mrc", true);
+                                //}
                                 GPU.CheckGPUExceptions();
                                 //TImagesReal[iterTrain] = refProjector.ProjectToRealspace(new int2(Dim), Helper.ArrayOfFunction(i => 
                                 //        new float3((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble()) * ((float)Math.PI * 2), BatchSize));
@@ -505,15 +506,16 @@ namespace ParticleWGANDev
                                               false,
                                               (uint)BatchSize);
 
-                                
-                                TImagesCTF[iterTrain].Multiply(TImagesCTF[iterTrain]);
+                                Image thisCTFSign = TImagesCTF[iterTrain].GetCopy();
+                                thisCTFSign.Sign();
+                                TImagesCTF[iterTrain].Multiply(thisCTFSign);
                                 Image fft = TImagesReal[iterTrain].AsFFT();
                                 TImagesReal[iterTrain].Dispose();
-                                fft.Multiply(TImagesCTF[iterTrain]);
+                                fft.Multiply(thisCTFSign);
                                 TImagesReal[iterTrain] = fft.AsIFFT();
                                 fft.Dispose();
-                                
-                                
+                                //TImagesCTF[iterTrain].Multiply(TImagesCTF[iterTrain]);
+
                                 GPU.NormParticles(TImagesReal[iterTrain].GetDevice(Intent.Read),
                                                   TImagesReal[iterTrain].GetDevice(Intent.Write),
                                                   TImagesReal[iterTrain].Dims.Slice(),
@@ -576,8 +578,9 @@ namespace ParticleWGANDev
                     float[] Loss = null;
                     float[] LossReal = null;
                     float[] LossFake = null;
-                    Image Prediction = null;
-                    Image PredictionNoisy = null;
+                    Image PredictionDisc = null;
+                    Image PredictionGen = null;
+                    Image PredictionGenNoisy = null;
                     float[] SourceData = null;
                     float[] TargetData = null;
                     float[] AverageData = null;
@@ -593,7 +596,7 @@ namespace ParticleWGANDev
                                                                   ImagesCTF[iterDisc],
                                                                   CurrentLearningRate,
                                                                   Lambda,
-                                                                  out Prediction,
+                                                                  out PredictionDisc,
                                                                   out Loss,
                                                                   out LossReal,
                                                                   out LossFake);
@@ -605,8 +608,8 @@ namespace ParticleWGANDev
                         if (TrainGen)
                             TrainModel.TrainGeneratorParticle( ImagesAngles[DiscIters], ImagesCTF[DiscIters], ImagesReal[DiscIters],
                                                               CurrentLearningRate,
-                                                              out Prediction,
-                                                              out PredictionNoisy,
+                                                              out PredictionGen,
+                                                              out PredictionGenNoisy,
                                                               out Loss);
                          HasBeenProcessed = true;
                     }
@@ -623,7 +626,7 @@ namespace ParticleWGANDev
 
                         float2 GlobalMeanStd = MathHelper.MeanAndStd(ImagesReal[0].GetHost(Intent.Read)[0]);
 
-                        Func<float[], ImageSource> MakeImage = (data) =>
+                        Func<float[], float2, ImageSource> MakeImage = (data, stat) =>
                         {
                             float[] OneSlice = data.ToArray();
                             GlobalMeanStd = MathHelper.MeanAndStd(OneSlice);
@@ -632,7 +635,7 @@ namespace ParticleWGANDev
                             for (int y = 0; y < Dim; y++)
                                 for (int x = 0; x < Dim; x++)
                                 {
-                                    float Value = (OneSlice[y * Dim + x] - GlobalMeanStd.X) / GlobalMeanStd.Y;
+                                    float Value = (OneSlice[y * Dim + x] - stat.X) / stat.Y;
                                     Value = (Value + 4f) / 8f;
                                     BytesXY[(Dim - 1 - y) * Dim + x] = (byte)(Math.Max(0, Math.Min(1, Value)) * 255);
                                 }
@@ -643,22 +646,24 @@ namespace ParticleWGANDev
                             return SliceImage;
                         };
 
+                        float[] all_data = new List<float>().Concat(ImagesReal[DiscIters].GetHost(Intent.Read)[0]).Concat(PredictionGenNoisy.GetHost(Intent.Read)[0]).Concat(PredictionGen.GetHost(Intent.Read)[0]).ToArray();
+                        float2 stat = MathHelper.MeanAndStd(all_data);
                         {
-                            ImageSource SliceImage = MakeImage(ImagesReal[DiscIters].GetHost(Intent.Read)[0]);
+                            ImageSource SliceImage = MakeImage(ImagesReal[DiscIters].GetHost(Intent.Read)[0], stat);
                             Dispatcher.Invoke(() => ImageSource.Source = SliceImage);
                         }
 
                         {
-                            ImageSource SliceImage = MakeImage(PredictionNoisy.GetHost(Intent.Read)[0]);
+                            ImageSource SliceImage = MakeImage(PredictionGenNoisy.GetHost(Intent.Read)[0], stat);
                             Dispatcher.Invoke(() => ImageTarget.Source = SliceImage);
                         }
 
                         {
-                            ImageSource SliceImage = MakeImage(Prediction.GetHost(Intent.Read)[0]);
+                            ImageSource SliceImage = MakeImage(PredictionGen.GetHost(Intent.Read)[0], stat);
                             Dispatcher.Invoke(() => ImageAverage.Source = SliceImage);
                         }
 
-                        Prediction.WriteMRC("d_gen.mrc", true);
+                        PredictionGen.WriteMRC("d_gen.mrc", true);
 
                         if (ShouldSaveModel)
                         {
@@ -676,8 +681,8 @@ namespace ParticleWGANDev
                             {
                                 Image.Stack(ImagesReal).WriteMRC(WorkingDirectory + @"ParticleWGAN_SN_" + datestring + "_real.mrc", true);
                                 Image.Stack(ImagesCTF).WriteMRC(WorkingDirectory + @"ParticleWGAN_SN_" + datestring + "_ctf.mrc", true);
-                                Prediction.WriteMRC(WorkingDirectory + @"ParticleWGAN_SN_" + datestring + "_prediction.mrc", true);
-                                PredictionNoisy.WriteMRC(WorkingDirectory + @"ParticleWGAN_SN_" + datestring + "_predictionNoisy.mrc", true);
+                                PredictionGen.WriteMRC(WorkingDirectory + @"ParticleWGAN_SN_" + datestring + "_prediction.mrc", true);
+                                PredictionGenNoisy.WriteMRC(WorkingDirectory + @"ParticleWGAN_SN_" + datestring + "_predictionNoisy.mrc", true);
                             }
 
                         }
