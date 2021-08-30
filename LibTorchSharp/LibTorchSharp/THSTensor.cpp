@@ -1235,6 +1235,11 @@ Tensor THSTensor_mean_along_dimensions(const Tensor tensor, const int64_t* dimen
         tensor->mean(at::ArrayRef<int64_t>(dimensions, length), keepdim))
 }
 
+Tensor THSTensor_std_along_dimensions(const Tensor tensor, const int64_t* dimensions, int length, bool ubiased, bool keepdim)
+{
+    CATCH_TENSOR(tensor->std(at::ArrayRef<int64_t>(dimensions, length), ubiased, keepdim))
+}
+
 Tensor THSTensor_median(const Tensor tensor)
 {
     CATCH_TENSOR(tensor->median());

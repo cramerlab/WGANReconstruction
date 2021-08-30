@@ -30,7 +30,7 @@
             <Button Name="ButtonStartParticle" Content="Run particle" Margin="10" Click="ButtonStartParticle_OnClick" />
             <Button Name="ButtonSave" Content="Save" Margin="10" Click="ButtonSave_OnClick" />
             <Button Name="ButtonTest" Content="Test" Margin="10" Click="ButtonTest_OnClick" />
-            <CheckBox Name="CheckSaveRecs" Content="Write out reconstructions" Margin="10" />
+            <CheckBox Name="CheckSaveRecs" Content="Write out reconstructions" Margin="10" Checked="CheckSaveRecs_Checked" Unchecked="CheckSaveRecs_Unchecked"/>
 
             <TextBlock Name="TextCoverage" Margin="10" Text="Every particle seen 0.000 times"/>
 
