@@ -60,7 +60,7 @@ namespace ParticleWGANDev
         int DiscIters = 4;
         bool TrainGen = true;
 
-        int NThreads = 3;
+        int NThreads = 1;
         int ProcessingDevice = 0;
 
         public MainWindow()
@@ -368,7 +368,7 @@ namespace ParticleWGANDev
                 //ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 32, new[] { 1 }, BatchSize);
                 Image refVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
                 ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), 10, new[] { 1 }, BatchSize);
-                TrainModel.Load(@"D:\GANRecon\ParticleWGAN_SN_20210830_161014.pt");
+                //TrainModel.Load(@"D:\GANRecon\ParticleWGAN_SN_20210830_170236.pt");
                 WriteToLog("Done. (" + GPU.GetFreeMemory(1) + " MB free)");
 
                 GPU.SetDevice(ProcessingDevice);
@@ -415,7 +415,7 @@ namespace ParticleWGANDev
                 CTF[] AllParticleCTF = TableIn.GetRelionCTF();
                 float3[] AllParticleAngles = TableIn.GetRelionAngles().Select(s=>s*Helper.ToRad).ToArray();
                 int[] AllIDs = Helper.ArrayOfSequence(0, AllParticleAddresses.Length, 1);
-
+                float3[] RandomParticleAngles = Helper.GetHealpixAngles(3);
                 ParameterizedThreadStart ReloadLambda = (par) =>
                 {
                     GPU.SetDevice(ProcessingDevice);
@@ -452,7 +452,7 @@ namespace ParticleWGANDev
                             for (int iterTrain = 0; iterTrain < DiscIters + 1; iterTrain++)
                             {
                                 int[] SubsetIDs = Helper.RandomSubset(AllIDs, BatchSize, ReloadRand.Next());
-
+                                int[] AngleIds = Helper.ArrayOfFunction(i => ReloadRand.Next(0, RandomParticleAngles.Length), BatchSize);
 
                                 // Read, and copy or rescale real and fake images from prepared stacks
                                 float[][] LoadStackData = LoadStack.GetHost(Intent.Write);
@@ -486,9 +486,9 @@ namespace ParticleWGANDev
                                 //TensorAngles.RandomNInPlace(TensorAngles.Shape);
                                 //TensorAngles *= 2 * Math.PI;
 
-                                float3[] theseAngles = Helper.IndexedSubset(AllParticleAngles, SubsetIDs);
+                                float3[] theseAngles = Helper.IndexedSubset(RandomParticleAngles, AngleIds);
                                 TImagesAngles[iterTrain] = Helper.ToInterleaved(theseAngles);
-                                GPU.CopyHostToDevice(TImagesAngles[iterTrain], TensorAngles.DataPtr(), TImagesAngles[iterTrain].Length);
+                                //GPU.CopyHostToDevice(TImagesAngles[iterTrain], TensorAngles.DataPtr(), TImagesAngles[iterTrain].Length);
                                 //using (var projected = gen.ForwardParticle(Float32Tensor.Zeros(new long[] { 1 }), TensorAngles, false, 0.0d)) 
                                 //{
                                 //    GPU.CopyDeviceToDevice(projected.DataPtr(), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
@@ -514,6 +514,7 @@ namespace ParticleWGANDev
                                 fft.Multiply(thisCTFSign);
                                 TImagesReal[iterTrain] = fft.AsIFFT();
                                 fft.Dispose();
+                                thisCTFSign.Dispose();
                                 //TImagesCTF[iterTrain].Multiply(TImagesCTF[iterTrain]);
 
                                 GPU.NormParticles(TImagesReal[iterTrain].GetDevice(Intent.Read),
@@ -529,7 +530,6 @@ namespace ParticleWGANDev
 
                                 //TImagesReal[iterTrain].Bandpass(0, (float)LowPass, false, 0.05f);
                                 TImagesReal[iterTrain].MaskSpherically(Dim / 2, Dim / 8, false);
-
                             }
 
                             OwnBatchUsed = false;
@@ -572,7 +572,7 @@ namespace ParticleWGANDev
                         continue;
 
                     ReloadBlock.WaitOne();
-
+                    
                     List<float> AllLossesReal = new List<float>();
                     List<float> AllLossesFake = new List<float>();
                     float[] Loss = null;
@@ -584,7 +584,7 @@ namespace ParticleWGANDev
                     float[] SourceData = null;
                     float[] TargetData = null;
                     float[] AverageData = null;
-
+                    var allImages = Image.getObjectIDs();
                     {
 
                         float CurrentLearningRate = 0;
@@ -600,11 +600,11 @@ namespace ParticleWGANDev
                                                                   out Loss,
                                                                   out LossReal,
                                                                   out LossFake);
-
+                            
                             AllLossesReal.Add(LossReal[0]);
                             AllLossesFake.Add(LossFake[0]);
                         }
-
+                        
                         if (TrainGen)
                             TrainModel.TrainGeneratorParticle( ImagesAngles[DiscIters], ImagesCTF[DiscIters], ImagesReal[DiscIters],
                                                               CurrentLearningRate,
@@ -690,7 +690,7 @@ namespace ParticleWGANDev
                         AllLossesReal.Clear();
                         AllLossesFake.Clear();
                     }
-
+                    
                     IterationsDone++;
                     Dispatcher.Invoke(() => TextCoverage.Text = $"{IterationsDone} iterations done");
 

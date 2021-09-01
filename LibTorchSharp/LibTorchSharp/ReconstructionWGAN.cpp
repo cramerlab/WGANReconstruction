@@ -343,7 +343,7 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
 
     ReconstructionWGANDiscriminatorImpl()
     {
-        const bool sn = false;
+        const bool sn = true;
 
         // Spatial
         {
