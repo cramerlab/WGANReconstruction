@@ -229,7 +229,7 @@ namespace GANRecon
                             TorchTensor loss = diffSqrd.Mean();
                             loss.Backward();*/
                             if (numBatch % discIters != 0) {
-                                model.TrainDiscriminatorParticle(source, sourceCTF, (float)0.0001, (float)2, out Image prediction, out float[] wLoss, out float[] rLoss, out float[] fLoss);
+                                model.TrainDiscriminatorParticle(Helper.ToInterleaved(BatchAngles), source, sourceCTF, (float)0.0001, (float)2, out Image prediction, out float[] wLoss, out float[] rLoss, out float[] fLoss);
                                 GPU.CheckGPUExceptions();
                                 float discLoss = wLoss[0];
                                 meanDiscLoss += (float)discLoss;
@@ -241,7 +241,7 @@ namespace GANRecon
                             }
                             else
                             {
-                                model.TrainGeneratorParticle(sourceCTF, (float)0.0001, out Image prediction, out Image predictionNoisy, out float[] genLoss);
+                                model.TrainGeneratorParticle(Helper.ToInterleaved(BatchAngles), sourceCTF, source, (float)0.0001, out Image prediction, out Image predictionNoisy, out float[] genLoss);
                                 GPU.CheckGPUExceptions();
                                 meanGenLoss += genLoss[0];
                                 genSteps++;

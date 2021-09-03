@@ -2527,6 +2527,23 @@ namespace TorchSharp.Tensor
         }
 
         [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSTensor_std_along_dimensions(IntPtr tensor, IntPtr dimensions, int length, bool ubiased, bool keepdim);
+
+        public TorchTensor Std(long[] dimensions, bool unbiased = false, bool keepDimension = false)
+        {
+            unsafe
+            {
+                fixed (long* pdims = dimensions)
+                {
+                    var res = THSTensor_std_along_dimensions(handle, (IntPtr)pdims, dimensions.Length, unbiased, keepDimension);
+                    if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+                    return new TorchTensor(res);
+                }
+            }
+        }
+
+
+        [DllImport("LibTorchSharp")]
         private static extern IntPtr THSTensor_median(IntPtr tensor);
 
         public TorchTensor Median()

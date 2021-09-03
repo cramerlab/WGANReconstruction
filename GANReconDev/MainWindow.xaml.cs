@@ -57,10 +57,10 @@ namespace ParticleWGANDev
 
         private int BatchSize = 16;
         float Lambda = 0.6f;
-        int DiscIters = 4;
+        int DiscIters = 8;
         bool TrainGen = true;
 
-        int NThreads = 1;
+        int NThreads = 3;
         int ProcessingDevice = 0;
 
         public MainWindow()
@@ -592,7 +592,8 @@ namespace ParticleWGANDev
 
                         for (int iterDisc = 0; iterDisc < DiscIters; iterDisc++)
                         {
-                            TrainModel.TrainDiscriminatorParticle(ImagesReal[iterDisc],
+                            TrainModel.TrainDiscriminatorParticle(ImagesAngles[iterDisc], 
+                                                                  ImagesReal[iterDisc],
                                                                   ImagesCTF[iterDisc],
                                                                   CurrentLearningRate,
                                                                   Lambda,
