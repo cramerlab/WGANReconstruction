@@ -324,9 +324,9 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
         torch::Tensor noisestd = torch::std(allnoise.flatten(1, 3), 1, true, true).unsqueeze(2).unsqueeze(3);
         torch::Tensor noisemean = torch::mean(allnoise.flatten(1, 3), 1, true).unsqueeze(2).unsqueeze(3);
         allnoise = (allnoise - noisemean) / (noisestd + 1e-4f);
-
+        
         //fakeimages = ProcessorImage->forward(fakeimages);
-        fakeimages = fakeimages.add(allnoise);
+        fakeimages = fakeimages.add(at::roll(allnoise, { std::rand() / RAND_MAX, std::rand() / RAND_MAX }, {2,3}));
 
         return fakeimages;
     }

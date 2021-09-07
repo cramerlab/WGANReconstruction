@@ -47,7 +47,7 @@ namespace ParticleWGANDev
         private bool ShouldSaveRecs = false;
 
 
-        private string WorkingDirectory = @"D:\GanRecon\";
+        private string WorkingDirectory = @"D:\GAN_recon_polcompl\";
         private string DirectoryReal = "particles";
         private string DirectoryFake = "sim";
 
@@ -57,10 +57,10 @@ namespace ParticleWGANDev
 
         private int BatchSize = 16;
         float Lambda = 0.6f;
-        int DiscIters = 8;
+        int DiscIters = 4;
         bool TrainGen = true;
 
-        int NThreads = 3;
+        int NThreads = 1;
         int ProcessingDevice = 0;
 
         public MainWindow()
@@ -362,11 +362,11 @@ namespace ParticleWGANDev
 
             Task.Run(() =>
             {
-                
+                int seed = 42;
                 WriteToLog("Loading model... (" + GPU.GetFreeMemory(1) + " MB free)");
-
+                Torch.SetSeed(seed);
                 //ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 32, new[] { 1 }, BatchSize);
-                Image refVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
+                //Image refVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
                 ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), 10, new[] { 1 }, BatchSize);
                 //TrainModel.Load(@"D:\GANRecon\ParticleWGAN_SN_20210830_170236.pt");
                 WriteToLog("Done. (" + GPU.GetFreeMemory(1) + " MB free)");
@@ -380,11 +380,11 @@ namespace ParticleWGANDev
                 Semaphore ReloadBlock = new Semaphore(1, 1);
                 bool HasBeenProcessed = true;
 
-                Star TableIn = new Star(Path.Combine(WorkingDirectory, "run_data.star"));
+                Star TableIn = new Star(Path.Combine(WorkingDirectory, "goodparticles.star"));
 
                 
                 
-                Random rand = new Random();
+                Random rand = new Random(seed);
 
 
                 string[] ColumnStackNames = TableIn.GetColumn("rlnImageName").Select(s => Helper.PathToNameWithExtension(s.Substring(s.IndexOf('@') + 1))).ToArray();
@@ -415,14 +415,14 @@ namespace ParticleWGANDev
                 CTF[] AllParticleCTF = TableIn.GetRelionCTF();
                 float3[] AllParticleAngles = TableIn.GetRelionAngles().Select(s=>s*Helper.ToRad).ToArray();
                 int[] AllIDs = Helper.ArrayOfSequence(0, AllParticleAddresses.Length, 1);
-                float3[] RandomParticleAngles = Helper.GetHealpixAngles(3);
+                float3[] RandomParticleAngles = Helper.GetHealpixAngles(3).Select(s => s * Helper.ToRad).ToArray();
                 ParameterizedThreadStart ReloadLambda = (par) =>
                 {
                     GPU.SetDevice(ProcessingDevice);
-                    Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
-                    var tensorRefVolume = TensorExtensionMethods.ToTorchTensor(TrefVolume.GetHostContinuousCopy(), new long[] { 1, 1, Dim, Dim, Dim }).ToDevice(TorchSharp.DeviceType.CUDA, ProcessingDevice);
-                    ReconstructionWGANGenerator gen = Modules.ReconstructionWGANGenerator(tensorRefVolume, Dim, 10);
-                    gen.ToCuda(ProcessingDevice);
+                   // Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
+                    //var tensorRefVolume = TensorExtensionMethods.ToTorchTensor(TrefVolume.GetHostContinuousCopy(), new long[] { 1, 1, Dim, Dim, Dim }).ToDevice(TorchSharp.DeviceType.CUDA, ProcessingDevice);
+                    //ReconstructionWGANGenerator gen = Modules.ReconstructionWGANGenerator(tensorRefVolume, Dim, 10);
+                    //gen.ToCuda(ProcessingDevice);
                     var TensorAngles = Float32Tensor.Zeros(new long[] { BatchSize, 3 }, DeviceType.CUDA, ProcessingDevice);
 
                     //Projector refProjector = new Projector(refVolume, 2);
@@ -592,8 +592,7 @@ namespace ParticleWGANDev
 
                         for (int iterDisc = 0; iterDisc < DiscIters; iterDisc++)
                         {
-                            TrainModel.TrainDiscriminatorParticle(ImagesAngles[iterDisc], 
-                                                                  ImagesReal[iterDisc],
+                            TrainModel.TrainDiscriminatorParticle(ImagesReal[iterDisc],
                                                                   ImagesCTF[iterDisc],
                                                                   CurrentLearningRate,
                                                                   Lambda,

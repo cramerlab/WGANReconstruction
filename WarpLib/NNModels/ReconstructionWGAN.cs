@@ -369,7 +369,6 @@ namespace Warp.NNModels
             OptimizerGen.SetLearningRateAdam(learningRate * GenBoost);
             OptimizerGenVolume.SetLearningRateAdam(learningRate * GenVolumeBoost);
             OptimizerGen.ZeroGrad();
-            OptimizerGenVolume.ZeroGrad();
 
             SyncParams();
             ResultPredicted.GetDevice(Intent.Write);
@@ -441,8 +440,7 @@ namespace Warp.NNModels
             loss = ResultLoss;
         }
 
-        public void TrainDiscriminatorParticle(float[] angles,
-                                               Image imagesReal,
+        public void TrainDiscriminatorParticle(Image imagesReal,
                                                Image imagesCTF,
                                                float learningRate,
                                                float penaltyLambda,
@@ -494,7 +492,6 @@ namespace Warp.NNModels
                     //TensorCrapCode[i].RandomNInPlace(TensorCrapCode[i].Shape);
                     TensorAngles[i].RandomNInPlace(TensorAngles[i].Shape);
                     TensorAngles[i] *= 2 * Math.PI;
-                    GPU.CopyHostToDevice(angles, TensorAngles[i].DataPtr(), DeviceBatch * 3);
                     using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, 0.5 * (2f / BoxDimensions.X)))
                     using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
                     using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
