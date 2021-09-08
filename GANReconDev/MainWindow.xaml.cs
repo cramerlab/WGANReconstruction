@@ -47,7 +47,7 @@ namespace ParticleWGANDev
         private bool ShouldSaveRecs = false;
 
 
-        private string WorkingDirectory = @"D:\GAN_recon_polcompl\";
+        private string WorkingDirectory = @"D:\GANRecon\";
         private string DirectoryReal = "particles";
         private string DirectoryFake = "sim";
 
@@ -380,7 +380,7 @@ namespace ParticleWGANDev
                 Semaphore ReloadBlock = new Semaphore(1, 1);
                 bool HasBeenProcessed = true;
 
-                Star TableIn = new Star(Path.Combine(WorkingDirectory, "goodparticles.star"));
+                Star TableIn = new Star(Path.Combine(WorkingDirectory, "run_data.star"));
 
                 
                 
@@ -592,7 +592,8 @@ namespace ParticleWGANDev
 
                         for (int iterDisc = 0; iterDisc < DiscIters; iterDisc++)
                         {
-                            TrainModel.TrainDiscriminatorParticle(ImagesReal[iterDisc],
+                            TrainModel.TrainDiscriminatorParticle(ImagesAngles[iterDisc], 
+                                                                  ImagesReal[iterDisc],
                                                                   ImagesCTF[iterDisc],
                                                                   CurrentLearningRate,
                                                                   Lambda,

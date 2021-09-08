@@ -390,7 +390,7 @@ namespace Warp.NNModels
 
                 //TensorAngles[i].RandomNInPlace(TensorAngles[i].Shape);
                 //TensorAngles[i] *= 2 * Math.PI;
-                using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, 0.5 * (2f / BoxDimensions.X)))
+                using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, (2.0 / BoxDimensions.X)))
                 using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
                 using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
                 using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
@@ -440,7 +440,8 @@ namespace Warp.NNModels
             loss = ResultLoss;
         }
 
-        public void TrainDiscriminatorParticle(Image imagesReal,
+        public void TrainDiscriminatorParticle(float[] angles,
+                                               Image imagesReal,
                                                Image imagesCTF,
                                                float learningRate,
                                                float penaltyLambda,
@@ -490,8 +491,9 @@ namespace Warp.NNModels
 
                     //TensorParticleCode[i].RandomNInPlace(TensorParticleCode[i].Shape);
                     //TensorCrapCode[i].RandomNInPlace(TensorCrapCode[i].Shape);
-                    TensorAngles[i].RandomNInPlace(TensorAngles[i].Shape);
-                    TensorAngles[i] *= 2 * Math.PI;
+                    //TensorAngles[i].RandomNInPlace(TensorAngles[i].Shape);
+                    //TensorAngles[i] *= 2 * Math.PI;
+                    GPU.CopyHostToDevice(angles, TensorAngles[i].DataPtr(), DeviceBatch * 3);
                     using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, 0.5 * (2f / BoxDimensions.X)))
                     using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
                     using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))

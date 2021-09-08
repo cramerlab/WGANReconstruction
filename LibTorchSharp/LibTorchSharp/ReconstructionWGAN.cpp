@@ -289,7 +289,10 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
         //torch::Tensor result = ParticleDecoder->forward(code).reshape({ -1, 1, _boxsize, _boxsize });
 
         torch::Tensor trans_matrices = matrix_from_angles(angles);
-        torch::Tensor shifts = torch::zeros({ angles.size(0), 3, 1 }, angles.options());
+        torch::Tensor shifts = torch::randn({ angles.size(0), 3, 1 }, angles.options()) * sigmashift;
+
+        //auto dimShift = shifts.sizes().vec();
+        //auto dimTransMat = trans_matrices.sizes().vec();
 
         trans_matrices = torch::cat({ trans_matrices, shifts }, 2);
 
