@@ -2527,6 +2527,16 @@ namespace TorchSharp.Tensor
         }
 
         [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSTensor_std(IntPtr tensor);
+
+        public TorchTensor Std()
+        {
+            var res = THSTensor_std(handle);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
+
+        [DllImport("LibTorchSharp")]
         private static extern IntPtr THSTensor_std_along_dimensions(IntPtr tensor, IntPtr dimensions, int length, bool ubiased, bool keepdim);
 
         public TorchTensor Std(long[] dimensions, bool unbiased = false, bool keepDimension = false)
