@@ -99,13 +99,7 @@ namespace Warp.NNModels
             Helper.ForCPU(0, NDevices, NDevices, null, (i, threadID) =>
             {
                 int DeviceID = Devices[i];
-                TorchTensor volume = Float32Tensor.Zeros(new long[] { 1, 1, boxDimensions.X, boxDimensions.X, boxDimensions.X });
-                if(initialVolume != null)
-                {
-                    volume = TensorExtensionMethods.ToTorchTensor(initialVolume.GetHostContinuousCopy(), new long[] { 1, 1, boxDimensions.X, boxDimensions.X, boxDimensions.X });
-                }
-                Generators[i] = ReconstructionWGANGenerator(volume, BoxDimensions.X, codeLength);
-                Generators[i].ToCuda(DeviceID);
+
 
                 Discriminators[i] = ReconstructionWGANDiscriminator();
                 Discriminators[i].ToCuda(DeviceID);
@@ -147,7 +141,16 @@ namespace Warp.NNModels
                     Mask.Dispose();
                 }
 
+                TorchTensor volume = Float32Tensor.Zeros(new long[] { 1, 1, boxDimensions.X, boxDimensions.X, boxDimensions.X });
+                //volume.RandomNInPlace(new long[] { 1, 1, boxDimensions.X, boxDimensions.X, boxDimensions.X });
+                if (initialVolume != null)
+                {
+                    volume = TensorExtensionMethods.ToTorchTensor(initialVolume.GetHostContinuousCopy(), new long[] { 1, 1, boxDimensions.X, boxDimensions.X, boxDimensions.X }).ToDevice(DeviceType.CUDA, DeviceID);
+                }
+                Generators[i] = ReconstructionWGANGenerator(volume, BoxDimensions.X, codeLength);
+                Generators[i].ToCuda(DeviceID);
             }, null);
+
 
             OptimizerGenVolume = Optimizer.Adam(Generators[0].GetParameters().Take(1), 0.01, 1e-4);
             OptimizerGen = Optimizer.Adam(Generators[0].GetParameters().Skip(1), 0.01, 1e-4);
@@ -340,11 +343,11 @@ namespace Warp.NNModels
                     }
 
                     Loss.Backward(TensorMinusOne[i]);
-                    /*
+                    
                     using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(TensorTrueImages[i], Prediction, penaltyLambda))
                     {
                         Penalty.Backward();
-                    }*/
+                    }
                 }
             }, null);
 
@@ -390,7 +393,7 @@ namespace Warp.NNModels
 
                 //TensorAngles[i].RandomNInPlace(TensorAngles[i].Shape);
                 //TensorAngles[i] *= 2 * Math.PI;
-                using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, (2.0 / BoxDimensions.X)))
+                using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, 0))
                 using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
                 using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
                 using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
@@ -494,7 +497,7 @@ namespace Warp.NNModels
                     //TensorAngles[i].RandomNInPlace(TensorAngles[i].Shape);
                     //TensorAngles[i] *= 2 * Math.PI;
                     GPU.CopyHostToDevice(angles, TensorAngles[i].DataPtr(), DeviceBatch * 3);
-                    using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, 0.5 * (2f / BoxDimensions.X)))
+                    using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, 0))
                     using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
                     using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
                     using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
@@ -520,13 +523,13 @@ namespace Warp.NNModels
 
 
                         
-                        //using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(TensorTrueImages[i], PredictionMasked, penaltyLambda))
+                        using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(TensorTrueImages[i], PredictionMasked, penaltyLambda))
                         //using(TorchTensor added = LossFake+LossReal)
                         //using(TorchTensor wLoss = Penalty+ added)
                         {
                             LossReal.Backward();
                             LossFake.Backward();
-                            //Penalty.Backward();
+                            Penalty.Backward();
                             //wLoss.Backward();
                         }
                     }

@@ -24,12 +24,12 @@ namespace GANRecon
 
         static void Main(string[] args)
         {
-            int boxLength = 64;
+            int boxLength = 32;
             int originalLength = -1;
             int2 boxsize = new(boxLength);
             int[] devices = { 1 };
             GPU.SetDevice(devices[0]);
-            int batchSize = 16;
+            int batchSize = 128;
             int numEpochs = 1000;
             int discIters = 8;
             //var NoiseNet = new NoiseNet2DTorch(boxsize, devices, batchSize);

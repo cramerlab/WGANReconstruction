@@ -165,6 +165,8 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
     torch::nn::Sequential ProcessorAdd;
     torch::nn::Sequential ProcessorMul;
 
+    torch::nn::Sequential ProcessorAngles;
+
     int64_t _codelength;
 
     int64_t _boxsize;
@@ -281,6 +283,15 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
 
             register_module("processor_mul", ProcessorMul);
         }
+
+        {
+            ProcessorAngles->push_back(torch::nn::Linear(torch::nn::LinearOptions(3, 9)));
+            ProcessorAngles->push_back(torch::nn::Linear(torch::nn::LinearOptions(18, 36)));
+            ProcessorAngles->push_back(torch::nn::Linear(torch::nn::LinearOptions(36, 18)));
+            ProcessorAngles->push_back(torch::nn::Linear(torch::nn::LinearOptions(18, 9)));
+
+            register_module("processor_angles", ProcessorAngles);
+        }
     }
 
     torch::Tensor forward_particle(torch::Tensor code, torch::Tensor angles, bool transform, double sigmashift)
@@ -312,7 +323,7 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
         /*torch::Tensor crap = CrapDecoder0->forward(crapcode);
         crap = crap.view({ -1, 64, 32, 32 });
         crap = CrapDecoder->forward(crap);*/
-
+        /*
         torch::Tensor noise_add = torch::randn(fakeimages.sizes(), fakeimages.options());
         //noise_add = noise_add.add(crap);
         noise_add = ProcessorAdd->forward(noise_add);
@@ -329,8 +340,8 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
         allnoise = (allnoise - noisemean) / (noisestd + 1e-4f);
         
         //fakeimages = ProcessorImage->forward(fakeimages);
-        fakeimages = fakeimages.add(at::roll(allnoise, { std::rand() / RAND_MAX, std::rand() / RAND_MAX }, {2,3}));
-
+        fakeimages = fakeimages.add(at::roll(allnoise, { (long long)((std::rand() / RAND_MAX)-0.5)* fakeimages.size(2), (long long)((std::rand() / RAND_MAX) - 0.5) * fakeimages.size(3) }, {2,3}));
+        */
         return fakeimages;
     }
 };
@@ -346,7 +357,7 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
 
     ReconstructionWGANDiscriminatorImpl()
     {
-        const bool sn = true;
+        const bool sn = false;
 
         // Spatial
         {
@@ -442,32 +453,92 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
             //    DiscriminatorPooled->push_back(torch::nn::Linear(torch::nn::LinearOptions(64, 1)));
             // 
             if (sn) {
+                
+                Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(1, 96, 7).stride(1).padding(3)));
+                //Discriminator->push_back(torch::nn::BatchNorm2d(torch::nn::BatchNorm2dOptions(96)));
+                //Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2)));
+                Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
+                Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(96, 96, 3).stride(2).padding(1)));
+                Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
+                Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(96, 192, 5).stride(1).padding(2)));
+                //Discriminator->push_back(torch::nn::BatchNorm2d(torch::nn::BatchNorm2dOptions(192)));
+                //Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2)));
+                Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
+                Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(192, 192, 3).stride(2).padding(1)));
+                Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
+                Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(192, 384, 3).stride(1).padding(1)));
+                //Discriminator->push_back(torch::nn::BatchNorm2d(torch::nn::BatchNorm2dOptions(384)));
+                //Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2)));
+                Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
+                Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(384, 384, 3).stride(2).padding(1)));
+                Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
+                Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(384, 768, 3).stride(1).padding(1)));
+                //Discriminator->push_back(torch::nn::BatchNorm2d(torch::nn::BatchNorm2dOptions(768)));
+                //Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2)));
+                Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
+                Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(768, 768, 3).stride(2).padding(1)));
+                Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
+                Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(768, 1536, 3).stride(1).padding(1)));
+                //Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2)));
+                Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
+                Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(1536, 1536, 3).stride(2).padding(1)));
+                Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
+                /*
+
                 Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(1, 96, 7).stride(1).padding(3)));
                 //Discriminator->push_back(torch::nn::BatchNorm2d(torch::nn::BatchNorm2dOptions(96)));
                 Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
+                //Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(96, 96, 3).stride(2).padding(1)));
+                //Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
 
                 Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(96, 192, 5).stride(1).padding(2)));
                 //Discriminator->push_back(torch::nn::BatchNorm2d(torch::nn::BatchNorm2dOptions(192)));
                 Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
 
+                //Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(192, 192, 3).stride(2).padding(1)));
+                //Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
                 Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(192, 384, 3).stride(1).padding(1)));
                 //Discriminator->push_back(torch::nn::BatchNorm2d(torch::nn::BatchNorm2dOptions(384)));
                 Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
+                //Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(384, 384, 3).stride(2).padding(1)));
+                //Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
 
                 Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(384, 768, 3).stride(1).padding(1)));
                 //Discriminator->push_back(torch::nn::BatchNorm2d(torch::nn::BatchNorm2dOptions(768)));
                 Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
 
+                //Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(768, 768, 3).stride(2).padding(1)));
+                //Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
                 Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(768, 1536, 3).stride(1).padding(1)));
                 Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
 
+                //Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(1536, 1536, 3).stride(2).padding(1)));
+                //Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+
+                */
+
                 Discriminator->push_back(torch::nn::Flatten(torch::nn::FlattenOptions()));
-                Discriminator->push_back(SpNormLinear(torch::nn::LinearOptions(6144, 100)));
+                Discriminator->push_back(SpNormLinear(torch::nn::LinearOptions(1536, 100)));
+                Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
                 Discriminator->push_back(SpNormLinear(torch::nn::LinearOptions(100, 1)));
             }
             else {
@@ -496,7 +567,8 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
 
                 Discriminator->push_back(torch::nn::Flatten(torch::nn::FlattenOptions()));
-                Discriminator->push_back(torch::nn::Linear(torch::nn::LinearOptions(6144, 100)));
+                Discriminator->push_back(torch::nn::Linear(torch::nn::LinearOptions(1536, 100)));
+                Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
                 Discriminator->push_back(torch::nn::Linear(torch::nn::LinearOptions(100, 1)));
             }
 
@@ -564,7 +636,9 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
         //x = x.squeeze(2);
 
         //return /*decision_spectral +*/ decision_spatial;
-        return Discriminator->forward(image);
+        auto out = Discriminator->forward(image);
+        //auto outDims = out.sizes().vec();
+        return out;
     }
 
     void ClipWeights(double min, double max)
