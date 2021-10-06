@@ -437,7 +437,7 @@ namespace ParticleWGANDev
                     TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_region.mrc");
                     TrefVolume = TrefVolume.AsScaled(new int3(Dim));
                     TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_scaled.mrc");
-                    TrefVolume.MaskSpherically(Dim / 2 + 2 * Dim / 8, Dim / 8, true);
+                    //TrefVolume.MaskSpherically(Dim / 2 + 2 * Dim / 8, Dim / 8, true);
                     TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_masked.mrc");
                     var tensorRefVolume = TensorExtensionMethods.ToTorchTensor(TrefVolume.GetHostContinuousCopy(), new long[] { 1, 1, Dim, Dim, Dim }).ToDevice(TorchSharp.DeviceType.CUDA, ProcessingDevice);
 
@@ -453,7 +453,7 @@ namespace ParticleWGANDev
                         Mask.Dispose();
 
 
-                        tensorRefVolume *= volumeMask;
+                        //tensorRefVolume *= volumeMask;
                         using (TorchTensor MaskSum = volumeMask.Sum())
                         using (TorchTensor volumeMean = tensorRefVolume.Sum() / MaskSum)
                         using (TorchTensor volumeStd = (tensorRefVolume - volumeMean).Pow(2).Mean().Sqrt())
