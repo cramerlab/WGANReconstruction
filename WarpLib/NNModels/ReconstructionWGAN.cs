@@ -191,36 +191,6 @@ namespace Warp.NNModels
             }
         }
 
-        public void Predict(Image imagesFake,
-                                   Image imagesCTF,
-                                   out Image prediction)
-        {
-            ResultPredicted.GetDevice(Intent.Write);
-
-            Helper.ForCPU(0, NDevices, NDevices, null, (i, threadID) =>
-            {
-                Generators[i].Eval();
-
-                GPU.CopyDeviceToDevice(imagesFake.GetDeviceSlice(i * DeviceBatch, Intent.Read),
-                                       TensorFakeImages[i].DataPtr(),
-                                       DeviceBatch * BoxDimensions.Elements());
-                GPU.CopyDeviceToDevice(imagesCTF.GetDeviceSlice(i * DeviceBatch, Intent.Read),
-                                       TensorCTF[i].DataPtr(),
-                                       DeviceBatch * BoxDimensions.ElementsFFT());
-
-                TensorCrapCode[i].RandomNInPlace(TensorCrapCode[i].Shape);
-
-                using (TorchTensor Prediction = Generators[i].ForwardNoise(TensorCrapCode[i], TensorFakeImages[i], TensorCTF[i]))
-                {
-                    GPU.CopyDeviceToDevice(Prediction.DataPtr(),
-                                           ResultPredicted.GetDeviceSlice(i * DeviceBatch, Intent.Write),
-                                           DeviceBatch * (int)BoxDimensions.Elements());
-                }
-            }, null);
-
-            prediction = ResultPredicted;
-        }
-
         public Image getVolume()
         {
             var tensors = Generators[0].GetParameters();
@@ -231,139 +201,6 @@ namespace Warp.NNModels
             imageVolume.FreeDevice();
             return imageVolume;
         }
-        public void TrainGenerator(Image imagesFake,
-                                   Image imagesCTF,
-                                   float learningRate,
-                                   out Image prediction,
-                                   out float[] loss)
-        {
-            OptimizerGen.SetLearningRateAdam(learningRate);
-            OptimizerGen.ZeroGrad();
-
-            SyncParams();
-            ResultPredicted.GetDevice(Intent.Write);
-
-            Helper.ForCPU(0, NDevices, NDevices, null, (i, threadID) =>
-            {
-                Generators[i].Train();
-                Generators[i].ZeroGrad();
-
-                GPU.CopyDeviceToDevice(imagesFake.GetDeviceSlice(i * DeviceBatch, Intent.Read),
-                                       TensorFakeImages[i].DataPtr(),
-                                       DeviceBatch * BoxDimensions.Elements());
-                GPU.CopyDeviceToDevice(imagesCTF.GetDeviceSlice(i * DeviceBatch, Intent.Read),
-                                       TensorCTF[i].DataPtr(),
-                                       DeviceBatch * BoxDimensions.ElementsFFT());
-
-                TensorCrapCode[i].RandomNInPlace(TensorCrapCode[i].Shape);
-
-                using (TorchTensor Prediction = Generators[i].ForwardNoise(TensorCrapCode[i], TensorFakeImages[i], TensorCTF[i]))
-                using (TorchTensor IsItReal = Discriminators[i].Forward(Prediction))
-                using (TorchTensor Loss = IsItReal.Mean())
-                {
-                    GPU.CopyDeviceToDevice(Prediction.DataPtr(),
-                                           ResultPredicted.GetDeviceSlice(i * DeviceBatch, Intent.Write),
-                                           DeviceBatch * (int)BoxDimensions.Elements());
-                    if (i == 0)
-                        GPU.CopyDeviceToHost(Loss.DataPtr(), ResultLoss, 1);
-
-                    Loss.Backward(TensorOne[i]);
-                }
-            }, null);
-
-            GatherGrads();
-
-            OptimizerGen.Step();
-            OptimizerGenVolume.Step();
-
-            prediction = ResultPredicted;
-            loss = ResultLoss;
-        }
-
-        public void TrainDiscriminator(Image imagesReal,
-                                       Image imagesFake,
-                                       Image imagesCTF,
-                                       float learningRate,
-                                       float penaltyLambda,
-                                       out Image prediction,
-                                       out float[] lossWasserstein,
-                                       out float[] lossReal,
-                                       out float[] lossFake)
-        {
-            OptimizerDisc.SetLearningRateAdam(learningRate);
-            OptimizerDisc.ZeroGrad();
-
-            SyncParams();
-            ResultPredicted.GetDevice(Intent.Write);
-
-            Helper.ForCPU(0, NDevices, NDevices, null, (i, threadID) =>
-            {
-                Discriminators[i].Train();
-                Discriminators[i].ZeroGrad();
-
-                //Discriminators[i].ClipWeights(weightClip);
-
-                GPU.CopyDeviceToDevice(imagesReal.GetDeviceSlice(i * DeviceBatch, Intent.Read),
-                                       TensorTrueImages[i].DataPtr(),
-                                       BoxDimensions.Elements() * DeviceBatch);
-                GPU.CopyDeviceToDevice(imagesFake.GetDeviceSlice(i * DeviceBatch, Intent.Read),
-                                       TensorFakeImages[i].DataPtr(),
-                                       DeviceBatch * BoxDimensions.Elements());
-                GPU.CopyDeviceToDevice(imagesCTF.GetDeviceSlice(i * DeviceBatch, Intent.Read),
-                                       TensorCTF[i].DataPtr(),
-                                       DeviceBatch * BoxDimensions.ElementsFFT());
-
-                float LossWasserstein = 0;
-
-                using (TorchTensor IsItReal = Discriminators[i].Forward(TensorTrueImages[i]))
-                using (TorchTensor Loss = IsItReal.Mean())
-                {
-                    if (i == 0)
-                    {
-                        GPU.CopyDeviceToHost(Loss.DataPtr(), ResultLossDiscReal, 1);
-                        LossWasserstein = ResultLossDiscReal[0];
-                    }
-
-                    Loss.Backward(TensorOne[i]);
-                }
-
-                //TensorCrapCode[i].RandomNInPlace(TensorCrapCode[i].Shape);
-
-                //using (TorchTensor Prediction = Generators[i].ForwardNoise(TensorCrapCode[i], TensorFakeImages[i], TensorCTF[i]))
-                TorchTensor Prediction = TensorFakeImages[i];
-                using (TorchTensor PredictionDetached = Prediction.Detach())
-                using (TorchTensor IsItReal = Discriminators[i].Forward(PredictionDetached))
-                using (TorchTensor Loss = IsItReal.Mean())
-                {
-                    GPU.CopyDeviceToDevice(Prediction.DataPtr(),
-                                           ResultPredicted.GetDeviceSlice(i * DeviceBatch, Intent.Write),
-                                           DeviceBatch * (int)BoxDimensions.Elements());
-                    if (i == 0)
-                    {
-                        GPU.CopyDeviceToHost(Loss.DataPtr(), ResultLossDiscFake, 1);
-                        LossWasserstein = LossWasserstein - ResultLossDiscFake[0];
-                        ResultLoss[0] = LossWasserstein;
-                    }
-
-                    Loss.Backward(TensorMinusOne[i]);
-                    /*
-                    using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(TensorTrueImages[i], Prediction, penaltyLambda))
-                    {
-                        Penalty.Backward();
-                    }*/
-                }
-            }, null);
-
-            GatherGrads();
-
-            OptimizerDisc.Step();
-
-            prediction = ResultPredicted;
-            lossWasserstein = ResultLoss;
-            lossReal = ResultLossDiscReal;
-            lossFake = ResultLossDiscFake;
-        }
-
         public void TrainGeneratorParticle(float[] angles,
                                            Image imagesCTF,
                                            Image imagesReal,
@@ -544,13 +381,13 @@ namespace Warp.NNModels
 
 
                         
-                        using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(TensorTrueImages[i], PredictionNoisy, penaltyLambda))
+                        //using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(TensorTrueImages[i], PredictionNoisy, penaltyLambda))
                         //using(TorchTensor added = LossFake+LossReal)
                         //using(TorchTensor wLoss = Penalty+ added)
                         {
                             LossReal.Backward();
                             LossFake.Backward();
-                            Penalty.Backward();
+                            //Penalty.Backward();
                             //wLoss.Backward();
                         }
                     }
