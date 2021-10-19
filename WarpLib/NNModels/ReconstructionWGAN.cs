@@ -235,12 +235,12 @@ namespace Warp.NNModels
                 //TensorAngles[i].RandomNInPlace(TensorAngles[i].Shape);
                 //TensorAngles[i] *= 2 * Math.PI;
                 using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, sigmaShift))
-                //using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
-                //using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
-                //using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
+                using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
+                using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
+                using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
                 //using (TorchTensor PredictionIFFT = PredictionFT.irfftn(new long[] { 2, 3 }))
                 //using (TorchTensor PredictionNoisy = Generators[i].ForwardNoise(TensorCrapCode[i], Prediction, TensorCTF[i]))
-                using (TorchTensor PredictionNoisy = Prediction)
+                using (TorchTensor PredictionNoisy = PredictionConv)
                 //using (TorchTensor mean = PredictionNoisy.Mean(new long[] { 2, 3 }, true)) 
                 //using (TorchTensor std = PredictionNoisy.Std(new long[] { 2, 3 }, true, true))
                 //using (TorchTensor normalized = (PredictionNoisy - mean)/(std+1e-4))
@@ -356,11 +356,11 @@ namespace Warp.NNModels
                     //TensorAngles[i] *= 2 * Math.PI;
                     GPU.CopyHostToDevice(angles, TensorAngles[i].DataPtr(), DeviceBatch * 3);
                     using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, sigmaShift))
-                    //using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
-                    //using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
-                    //using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
+                    using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
+                    using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
+                    using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
                     //using (TorchTensor PredictionNoisy = Generators[i].ForwardNoise(TensorCrapCode[i], Prediction, TensorCTF[i]))
-                    using (TorchTensor PredictionNoisy = Prediction)
+                    using (TorchTensor PredictionNoisy = PredictionConv)
                     //using (TorchTensor PredictionNoisyMean = PredictionNoisy.Mean(new long[] { 2, 3 }, true))
                     //using (TorchTensor PredictionNoisyStd = PredictionNoisy.Std(new long[] { 2, 3 }, true, true))
                     //using (TorchTensor PredictionNoisyNormalized = (PredictionNoisy - PredictionNoisyMean) / (PredictionNoisyStd + 1e-4))

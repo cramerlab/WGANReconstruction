@@ -550,14 +550,26 @@ namespace ParticleWGANDev
                                 //TImagesReal[iterTrain] = refProjector.ProjectToRealspace(new int2(Dim), Helper.ArrayOfFunction(i => 
                                 //        new float3((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble()) * ((float)Math.PI * 2), BatchSize));
 
-                                /*GPU.CreateCTF(TImagesCTF[iterTrain].GetDevice(Intent.Write),
+                                GPU.CreateCTF(TImagesCTF[iterTrain].GetDevice(Intent.Write),
                                               CTFCoords.GetDevice(Intent.Read),
                                               IntPtr.Zero,
                                               (uint)CTFCoords.ElementsSliceComplex,
                                               Helper.IndexedSubset(AllParticleCTF, SubsetIDs).Select(c => c.ToStruct()).ToArray(),
                                               false,
-                                              (uint)BatchSize);*/
-                                TImagesCTF[iterTrain].Fill(1.0f);
+                                              (uint)BatchSize);
+                                Image thisCTFSign = TImagesCTF[iterTrain].GetCopy();
+                                thisCTFSign.Sign();
+                                TImagesCTF[iterTrain].Multiply(thisCTFSign);
+
+                                Image fft = TImagesReal[iterTrain].AsFFT();
+                                TImagesReal[iterTrain].Dispose();
+                                fft.Multiply(TImagesCTF[iterTrain]);
+                                TImagesReal[iterTrain] = fft.AsIFFT(false, 0, true);
+                                fft.Dispose();
+                                thisCTFSign.Dispose();
+
+
+                                //TImagesCTF[iterTrain].Fill(1.0f);
                                 /*
                                 Image thisCTFSign = TImagesCTF[iterTrain].GetCopy();
                                 thisCTFSign.Sign();
