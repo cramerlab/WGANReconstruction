@@ -62,7 +62,8 @@ namespace Warp.NNModels
 
         private double GenVolumeBoost = 10;
         private double GenBoost = 1;
-
+        private float generator_grad_clip_val = 10e6f;
+        private float discriminator_grad_clip_val = 10e6f;
         private double lambdaOutsideMask = 10;
 
         public ReconstructionWGAN(int2 boxDimensions, int codeLength, int[] devices, int batchSize = 8, Image initialVolume = null)
@@ -285,7 +286,7 @@ namespace Warp.NNModels
                 {
                     penalty.Backward();
                 }*/
-
+                Generators[i].Clip_Gradients(generator_grad_clip_val);
             }, null);
             
 
@@ -392,6 +393,7 @@ namespace Warp.NNModels
                         }
                     }
                 }
+                Discriminators[i].Clip_Gradients(discriminator_grad_clip_val);
             }, null);
 
             GatherGrads();

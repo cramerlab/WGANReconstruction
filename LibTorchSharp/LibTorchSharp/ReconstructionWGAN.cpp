@@ -591,6 +591,10 @@ NNModule THSNN_ReconstructionWGANGenerator_ctor(Tensor volume, int64_t boxsize, 
     //);
 }
 
+void THSNN_ReconstructionWGANGenerator_clip_gradient(const NNModule module, const float clip_Value) {
+    torch::nn::utils::clip_grad_norm_((*module)->as<ReconstructionWGANGeneratorImpl>()->parameters(), clip_Value);
+}
+
 Tensor THSNN_ReconstructionWGANGenerator_forward_particle(const NNModule module, const Tensor code, const Tensor angles, const bool transform, const double sigmashift)
 {
     CATCH_TENSOR((*module)->as<ReconstructionWGANGeneratorImpl>()->forward_particle(*code, *angles, transform, sigmashift));
@@ -621,6 +625,12 @@ NNModule THSNN_ReconstructionWGANDiscriminator_ctor(NNAnyModule* outAsAnyModule)
     return res;
     //);
 }
+
+void THSNN_ReconstructionWGANDiscriminator_clip_gradient(const NNModule module, const float clip_Value) 
+{
+    torch::nn::utils::clip_grad_norm_((*module)->as<ReconstructionWGANDiscriminatorImpl>()->parameters(), clip_Value);
+}
+
 
 Tensor THSNN_ReconstructionWGANDiscriminator_forward(const NNModule module, const Tensor input)
 {
