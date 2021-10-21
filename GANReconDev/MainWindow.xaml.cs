@@ -458,7 +458,7 @@ namespace ParticleWGANDev
                         using (TorchTensor volumeMean = tensorRefVolume.Sum() / MaskSum)
                         using (TorchTensor volumeStd = (tensorRefVolume - volumeMean).Pow(2).Mean().Sqrt())
                         {
-                            tensorRefVolume = volumeMask * (tensorRefVolume - volumeMean) / ((volumeStd + 1e-6) * (Dim));
+                            tensorRefVolume = 10* volumeMask * (tensorRefVolume - volumeMean) / ((volumeStd + 1e-6) * (Dim));
                         }
                     }
                     ReconstructionWGANGenerator gen = Modules.ReconstructionWGANGenerator(tensorRefVolume, Dim, 10);
@@ -582,7 +582,7 @@ namespace ParticleWGANDev
                                 fft.Dispose();
                                 thisCTFSign.Dispose();*/
                                 //TImagesReal[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_TImagesReal[{iterTrain}]_1beforeNoise.mrc", true);
-                                /*TImagesReal[iterTrain].TransformValues(val =>
+                                TImagesReal[iterTrain].TransformValues(val =>
                                 {
                                     //https://stackoverflow.com/a/218600/5012099
                                     double u1 = 1.0 - NoiseRand.NextDouble(); //uniform(0,1] random doubles
@@ -591,7 +591,7 @@ namespace ParticleWGANDev
                                                  Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
                                     double randNormal = 0 + 1 * randStdNormal;
                                     return (float)(val + randNormal);
-                                });*/
+                                });
 
                                 //TImagesCTF[iterTrain].Multiply(TImagesCTF[iterTrain]);
                                 //TImagesReal[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_TImagesReal[{iterTrain}]_withNoise.mrc", true);
