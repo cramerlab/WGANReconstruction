@@ -157,6 +157,16 @@ namespace TorchSharp.NN
             THSNN_Adam_setlearningrate(handle, learningrate);
         }
 
+
+        [DllImport("LibTorchSharp")]
+        private static extern void THSNN_Adam_setbetas(HType optimizer, double beta_1, double beta_2);
+
+        public void SetBetasAdam(double beta_1, double beta_2)
+        {
+            THSNN_Adam_setbetas(handle, beta_1, beta_2);
+        }
+
+
         [DllImport("LibTorchSharp")]
         private static extern void THSNN_SGD_setlearningrate(HType module, double learningrate);
 

@@ -614,6 +614,19 @@ void THSNN_Adam_setlearningrate(const Optimizer optimizer, const double learning
     }
 }
 
+void THSNN_Adam_setbetas(const Optimizer optimizer, const double beta_1, const double beta_2)
+{
+    for (auto& group : (*optimizer)->param_groups())
+    {
+        if (group.has_options())
+        {
+            auto& options = static_cast<torch::optim::AdamOptions&>(group.options());
+            std::tuple<double, double> newBetas(beta_1, beta_2);
+            options.betas(newBetas);
+        }
+    }
+}
+
 void THSNN_SGD_setlearningrate(const Optimizer optimizer, const double learning_rate)
 {
     for (auto& group : (*optimizer)->param_groups())

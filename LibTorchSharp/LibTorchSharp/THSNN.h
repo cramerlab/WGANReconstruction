@@ -84,6 +84,7 @@ EXPORT_API(Tensor) THSNN_poisson_loss(const Tensor input, const Tensor target, c
 
 EXPORT_API(Optimizer) THSNN_Adam_ctor(const Tensor* parameters, const int length, const double learnig_rate, const double weight_decay);
 EXPORT_API(void) THSNN_Adam_setlearningrate(const Optimizer optimizer, const double learning_rate);
+EXPORT_API(void) THSNN_Adam_setbetas(const Optimizer optimizer, const double beta_1, const double beta_2);
 
 EXPORT_API(Optimizer) THSNN_SGD_ctor(const Tensor* parameters, const int length, const double learnig_rate, const double momentum, const bool nesterov, const double weight_decay);
 EXPORT_API(void) THSNN_SGD_setlearningrate(const Optimizer optimizer, const double learning_rate);
