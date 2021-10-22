@@ -37,7 +37,7 @@ namespace ParticleWGANDev
             set { SetValue(LearningRateProperty, value); }
         }
 
-        public static readonly DependencyProperty LearningRateProperty = DependencyProperty.Register("LearningRate", typeof(decimal), typeof(MainWindow), new PropertyMetadata(0.0001M));
+        public static readonly DependencyProperty LearningRateProperty = DependencyProperty.Register("LearningRate", typeof(decimal), typeof(MainWindow), new PropertyMetadata(0.001M));
 
         
         private void CheckSaveRecs_Checked(object sender, RoutedEventArgs e) { ShouldSaveRecs = true; }
@@ -61,8 +61,8 @@ namespace ParticleWGANDev
         private double LowPass = 1.0;
 
         private int BatchSize = 16;
-        float Lambda = 0.6f;
-        int DiscIters = 8;
+        float Lambda = 0.001f;
+        int DiscIters = 4;
         bool TrainGen = true;
 
         int NThreads = 3;
@@ -427,6 +427,9 @@ namespace ParticleWGANDev
                 float3[] AllParticleAngles = TableIn.GetRelionAngles().Select(s=>s*Helper.ToRad).ToArray();
                 
                 float3[] RandomParticleAngles = Helper.GetHealpixAngles(3).Select(s => s * Helper.ToRad).ToArray();
+
+                int numParticles = RandomParticleAngles.Length;
+                int currentEpoch = 0;
                 ParameterizedThreadStart ReloadLambda = (par) =>
                 {
                 //int par = 1;
@@ -649,6 +652,12 @@ namespace ParticleWGANDev
                     if (HasBeenProcessed)
                         continue;
 
+                    if((IterationsDone+1)*BatchSize < 2 * numParticles)
+                    {
+                        float clipVal = (float)((IterationsDone + 1) * BatchSize * (DiscIters + 1) * 1e8 / (2 * numParticles));
+                        TrainModel.set_discriminator_grad_clip_val(clipVal);
+                    }
+
                     ReloadBlock.WaitOne();
                     
                     List<float> AllLossesReal = new List<float>();
@@ -810,8 +819,14 @@ namespace ParticleWGANDev
 
                     if ((IterationsDone + 1) % 1400 == 0)
                     {
-                        Dispatcher.Invoke(() => LearningRate /= 2);
+                        //Dispatcher.Invoke(() => LearningRate /= 2);
                         ShouldSaveModel = true;
+                    }
+
+                    if ((IterationsDone * BatchSize * (DiscIters + 1)) > (currentEpoch + 1) * numParticles) 
+                    { 
+                        currentEpoch += 1;
+                        Dispatcher.Invoke(() => LearningRate = LearningRate * 0.9M);
                     }
 
                     ReloadBlock.Release();

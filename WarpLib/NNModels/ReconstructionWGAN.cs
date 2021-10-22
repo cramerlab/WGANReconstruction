@@ -62,8 +62,8 @@ namespace Warp.NNModels
 
         private double GenVolumeBoost = 10;
         private double GenBoost = 1;
-        private float generator_grad_clip_val = 10e6f;
-        private float discriminator_grad_clip_val = 10e6f;
+        private float generator_grad_clip_val = 10e8f;
+        private float discriminator_grad_clip_val = 10e8f;
         private double lambdaOutsideMask = 10;
 
         public ReconstructionWGAN(int2 boxDimensions, int codeLength, int[] devices, int batchSize = 8, Image initialVolume = null)
@@ -156,9 +156,12 @@ namespace Warp.NNModels
             }, null);
 
 
-            OptimizerGenVolume = Optimizer.Adam(Generators[0].GetParameters().Take(1), 0.01, 1e-4);
-            OptimizerGen = Optimizer.Adam(Generators[0].GetParameters().Skip(1), 0.01, 1e-4);
-            OptimizerDisc = Optimizer.Adam(Discriminators[0].GetParameters(), 0.01, 1e-4);
+            OptimizerGenVolume = Optimizer.Adam(Generators[0].GetParameters().Take(1), 0.01, 1e-8);
+            OptimizerGenVolume.SetBetasAdam(0.5, 0.9);
+            OptimizerGen = Optimizer.Adam(Generators[0].GetParameters().Skip(1), 0.01, 1e-8);
+            OptimizerGen.SetBetasAdam(0.5, 0.9);
+            OptimizerDisc = Optimizer.Adam(Discriminators[0].GetParameters(), 0.01, 1e-8);
+            OptimizerDisc.SetBetasAdam(0.5, 0.9);
 
             ResultPredicted = new Image(IntPtr.Zero, new int3(BoxDimensions.X, BoxDimensions.Y, BatchSize));
             ResultPredictedNoisy = new Image(IntPtr.Zero, new int3(BoxDimensions.X, BoxDimensions.Y, BatchSize));
@@ -201,6 +204,11 @@ namespace Warp.NNModels
             GPU.CopyDeviceToDevice(tensorVolume.DataPtr(), imageVolume.GetDevice(Intent.Write), imageVolume.ElementsReal);
             imageVolume.FreeDevice();
             return imageVolume;
+        }
+
+        public void set_discriminator_grad_clip_val(float clip_val)
+        {
+            discriminator_grad_clip_val = clip_val;
         }
         public void TrainGeneratorParticle(float[] angles,
                                            Image imagesCTF,
