@@ -301,12 +301,12 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
 
         torch::Tensor trans_matrices = matrix_from_angles(angles);
         torch::Tensor shifts = torch::randn({ angles.size(0), 3, 1 }, angles.options()) * sigmashift;
-
+        shifts = shifts.minimum(torch::ones_like(shifts)*sigmashift*3);
         //auto dimShift = shifts.sizes().vec();
         //auto dimTransMat = trans_matrices.sizes().vec();
 
         trans_matrices = torch::cat({ trans_matrices, shifts }, 2);
-
+        trans_matrices = trans_matrices.to(_volume.device());
         torch::Tensor trans_grid = torch::nn::functional::affine_grid(trans_matrices, { angles.size(0), 1, _boxsize, _boxsize, _boxsize }, true);
         torch::Tensor volumeRot = torch::nn::functional::grid_sample(_volume.size(0) < angles.size(0) ? _volume.expand(c10::IntArrayRef(new int64_t[]{angles.size(0), -1, -1, -1, -1}, 5)) : _volume,
             trans_grid, torch::nn::functional::GridSampleFuncOptions().padding_mode(torch::kZeros).align_corners(true));
@@ -591,8 +591,8 @@ NNModule THSNN_ReconstructionWGANGenerator_ctor(Tensor volume, int64_t boxsize, 
     //);
 }
 
-void THSNN_ReconstructionWGANGenerator_clip_gradient(const NNModule module, const float clip_Value) {
-    torch::nn::utils::clip_grad_norm_((*module)->as<ReconstructionWGANGeneratorImpl>()->parameters(), clip_Value);
+double THSNN_ReconstructionWGANGenerator_clip_gradient(const NNModule module, const float clip_Value) {
+    return torch::nn::utils::clip_grad_norm_((*module)->as<ReconstructionWGANGeneratorImpl>()->parameters(), clip_Value);
 }
 
 Tensor THSNN_ReconstructionWGANGenerator_forward_particle(const NNModule module, const Tensor code, const Tensor angles, const bool transform, const double sigmashift)
@@ -626,9 +626,9 @@ NNModule THSNN_ReconstructionWGANDiscriminator_ctor(NNAnyModule* outAsAnyModule)
     //);
 }
 
-void THSNN_ReconstructionWGANDiscriminator_clip_gradient(const NNModule module, const float clip_Value) 
+double THSNN_ReconstructionWGANDiscriminator_clip_gradient(const NNModule module, const float clip_Value) 
 {
-    torch::nn::utils::clip_grad_norm_((*module)->as<ReconstructionWGANDiscriminatorImpl>()->parameters(), clip_Value);
+    return torch::nn::utils::clip_grad_norm_((*module)->as<ReconstructionWGANDiscriminatorImpl>()->parameters(), clip_Value);
 }
 
 

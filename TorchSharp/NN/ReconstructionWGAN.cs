@@ -9,11 +9,11 @@ namespace TorchSharp.NN
         internal ReconstructionWGANGenerator(IntPtr handle, IntPtr boxedHandle) : base(handle, boxedHandle) { }
 
         [DllImport("LibTorchSharp")]
-        private static extern void THSNN_ReconstructionWGANGenerator_clip_gradient(Module.HType module, float tensor);
+        private static extern double THSNN_ReconstructionWGANGenerator_clip_gradient(Module.HType module, float tensor);
 
-        public void Clip_Gradients(float clip_Value)
+        public double Clip_Gradients(float clip_Value)
         {
-            THSNN_ReconstructionWGANGenerator_clip_gradient(handle, clip_Value);
+            return THSNN_ReconstructionWGANGenerator_clip_gradient(handle, clip_Value);
         }
 
         [DllImport("LibTorchSharp")]
@@ -55,11 +55,11 @@ namespace TorchSharp.NN
         internal ReconstructionWGANDiscriminator(IntPtr handle, IntPtr boxedHandle) : base(handle, boxedHandle) { }
         
         [DllImport("LibTorchSharp")]
-        private static extern void THSNN_ReconstructionWGANDiscriminator_clip_gradient(Module.HType module, float tensor);
+        private static extern double THSNN_ReconstructionWGANDiscriminator_clip_gradient(Module.HType module, float tensor);
 
-        public void Clip_Gradients(float clip_Value)
+        public double Clip_Gradients(float clip_Value)
         {
-            THSNN_ReconstructionWGANDiscriminator_clip_gradient(handle, clip_Value);
+            return THSNN_ReconstructionWGANDiscriminator_clip_gradient(handle, clip_Value);
         }
 
         [DllImport("LibTorchSharp")]

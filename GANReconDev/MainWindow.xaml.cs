@@ -58,6 +58,10 @@ namespace ParticleWGANDev
         private int Dim = 32;
         private int Dim_zoom = 96;
 
+        private double sigmaShiftPix = 0.5;
+        private double sigmaShiftRel = 0.5d/( 32 / 2);
+
+
         private double LowPass = 1.0;
 
         private int BatchSize = 16;
@@ -373,6 +377,7 @@ namespace ParticleWGANDev
                 //ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 32, new[] { 1 }, BatchSize);
                 //Image refVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
                 ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), 10, new[] { 1 }, BatchSize);
+                TrainModel.SigmaShift = sigmaShiftRel;
                 //TrainModel.Load(@"D:\GAN_recon_polcompl\ParticleWGAN_SN_20210910_161349.pt");
                 WriteToLog("Done. (" + GPU.GetFreeMemory(1) + " MB free)");
 
@@ -386,8 +391,6 @@ namespace ParticleWGANDev
                 bool HasBeenProcessed = true;
 
                 Star TableIn = new Star(Path.Combine(WorkingDirectory, "cryosparc_P243_J525_003_particles.star"));
-
-                
                 
                 Random rand = new Random(seed);
 
@@ -465,8 +468,7 @@ namespace ParticleWGANDev
                         }
                     }
                     ReconstructionWGANGenerator gen = Modules.ReconstructionWGANGenerator(tensorRefVolume, Dim, 10);
-
-
+                    
                     gen.ToCuda(ProcessingDevice);
                     {
                         TorchTensor tensorVolume = gen.GetParameters()[0];
@@ -544,7 +546,7 @@ namespace ParticleWGANDev
                                 float3[] theseAngles = Helper.IndexedSubset(RandomParticleAngles, AngleIds);
                                 TImagesAngles[iterTrain] = Helper.ToInterleaved(theseAngles);
                                 GPU.CopyHostToDevice(TImagesAngles[iterTrain], TensorAngles.DataPtr(), TImagesAngles[iterTrain].Length);
-                                using (var projected = gen.ForwardParticle(Float32Tensor.Zeros(new long[] { 1 }), TensorAngles, false, 0.0d)) 
+                                using (var projected = gen.ForwardParticle(Float32Tensor.Zeros(new long[] { 1 }), TensorAngles, false, sigmaShiftRel)) 
                                 {
                                     GPU.CopyDeviceToDevice(projected.DataPtr(), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
                                     //TImagesReal[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_TImagesReal[{iterTrain}]_afterProj.mrc", true);
