@@ -7,14 +7,15 @@
         xmlns:sparta="clr-namespace:Sparta;assembly=WarpControls"
         xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
         mc:Ignorable="d"
-        Title="MainWindow" Width="800" Height="870">
-    <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="768" Height="768">
+        Title="MainWindow" Width="800" Height="1126">
+    <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="768" Height="1024">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="256" />
             <ColumnDefinition Width="256" />
             <ColumnDefinition Width="256" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
+            <RowDefinition Height="256" />
             <RowDefinition Height="256" />
             <RowDefinition Height="256" />
             <RowDefinition Height="256" />
@@ -53,6 +54,22 @@
             <lvc:CartesianChart.Series>
                 <lvc:LineSeries Name="SeriesLossReal" Title="Loss" LineSmoothness="0" StrokeThickness="1" Stroke="DeepPink" PointGeometry="{x:Null}" Fill="Transparent" />
                 <lvc:LineSeries Name="SeriesLossFake" Title="Loss" LineSmoothness="0" StrokeThickness="1" Stroke="DeepSkyBlue" PointGeometry="{x:Null}" Fill="Transparent" />
+            </lvc:CartesianChart.Series>
+        </lvc:CartesianChart>
+        <lvc:CartesianChart Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Height="256"  DisableAnimations="True" Hoverable="False" DataTooltip="{x:Null}" IsHitTestVisible="False">
+            <lvc:CartesianChart.AxisX>
+                <lvc:Axis ShowLabels="True" Title="Progress" MinValue="0">
+                    <lvc:Axis.Separator>
+                        <lvc:Separator StrokeThickness="0" />
+                    </lvc:Axis.Separator>
+                </lvc:Axis>
+            </lvc:CartesianChart.AxisX>
+            <lvc:CartesianChart.AxisY>
+                <lvc:Axis ShowLabels="True" Title="Loss" />
+            </lvc:CartesianChart.AxisY>
+            <lvc:CartesianChart.Series>
+                <lvc:LineSeries Name="SeriesGradNorm" Title="Loss" LineSmoothness="0" StrokeThickness="1" Stroke="DeepPink" PointGeometry="{x:Null}" Fill="Transparent" />
+                <lvc:LineSeries Name="SeriesGradNormGen" Title="Loss" LineSmoothness="0" StrokeThickness="1" Stroke="DeepSkyBlue" PointGeometry="{x:Null}" Fill="Transparent" />
             </lvc:CartesianChart.Series>
         </lvc:CartesianChart>
     </Grid>

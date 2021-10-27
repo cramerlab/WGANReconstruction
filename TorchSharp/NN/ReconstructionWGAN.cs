@@ -9,9 +9,9 @@ namespace TorchSharp.NN
         internal ReconstructionWGANGenerator(IntPtr handle, IntPtr boxedHandle) : base(handle, boxedHandle) { }
 
         [DllImport("LibTorchSharp")]
-        private static extern double THSNN_ReconstructionWGANGenerator_clip_gradient(Module.HType module, float tensor);
+        private static extern double THSNN_ReconstructionWGANGenerator_clip_gradient(Module.HType module, double clip_Value);
 
-        public double Clip_Gradients(float clip_Value)
+        public double Clip_Gradients(double clip_Value)
         {
             return THSNN_ReconstructionWGANGenerator_clip_gradient(handle, clip_Value);
         }
@@ -55,9 +55,9 @@ namespace TorchSharp.NN
         internal ReconstructionWGANDiscriminator(IntPtr handle, IntPtr boxedHandle) : base(handle, boxedHandle) { }
         
         [DllImport("LibTorchSharp")]
-        private static extern double THSNN_ReconstructionWGANDiscriminator_clip_gradient(Module.HType module, float tensor);
+        private static extern double THSNN_ReconstructionWGANDiscriminator_clip_gradient(Module.HType module, double clip_Value);
 
-        public double Clip_Gradients(float clip_Value)
+        public double Clip_Gradients(double clip_Value)
         {
             return THSNN_ReconstructionWGANDiscriminator_clip_gradient(handle, clip_Value);
         }
@@ -67,9 +67,21 @@ namespace TorchSharp.NN
 
         public TorchTensor Forward(TorchTensor tensor)
         {
-            var res = THSNN_ReconstructionWGANDiscriminator_forward(handle, tensor.Handle);
+            var norm = NormalizeProjection(tensor);
+            var res = THSNN_ReconstructionWGANDiscriminator_forward(handle, norm.Handle);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
+        }
+
+        public TorchTensor NormalizeProjection(TorchTensor t)
+        {
+            TorchTensor ret;
+            using (TorchTensor mean = t.Mean(new long[] { 2, 3 }, true))
+            using (TorchTensor std = t.Std(new long[] { 2, 3 }, true, true))
+            {
+                ret = (t - mean) / (std + 1e-6);
+            }
+            return ret;
         }
 
         [DllImport("LibTorchSharp")]

@@ -84,7 +84,8 @@ namespace GANRecon
                 }
 
                 var model = new ReconstructionWGAN(new int2(boxLength), 10, devices, batchSize);
-                model.getVolume();
+                model.SigmaShift = 1.0d / (32 / 2);
+                //model.getVolume();
                 int startEpoch = 0;
                 if (startEpoch > 0)
                 {
@@ -229,7 +230,7 @@ namespace GANRecon
                             TorchTensor loss = diffSqrd.Mean();
                             loss.Backward();*/
                             if (numBatch % discIters != 0) {
-                                model.TrainDiscriminatorParticle(Helper.ToInterleaved(BatchAngles), source, sourceCTF, (float)0.0001, (float)2, out Image prediction, out float[] wLoss, out float[] rLoss, out float[] fLoss);
+                                model.TrainDiscriminatorParticle(Helper.ToInterleaved(BatchAngles), source, sourceCTF, (float)0.0001, (float)2, out Image prediction, out float[] wLoss, out float[] rLoss, out float[] fLoss, out double gradNormDisc);
                                 GPU.CheckGPUExceptions();
                                 float discLoss = wLoss[0];
                                 meanDiscLoss += (float)discLoss;
@@ -241,7 +242,7 @@ namespace GANRecon
                             }
                             else
                             {
-                                model.TrainGeneratorParticle(Helper.ToInterleaved(BatchAngles), sourceCTF, source, (float)0.0001, out Image prediction, out Image predictionNoisy, out float[] genLoss);
+                                model.TrainGeneratorParticle(Helper.ToInterleaved(BatchAngles), sourceCTF, source, (float)0.0001, out Image prediction, out Image predictionNoisy, out float[] genLoss, out double gradNormDisc);
                                 GPU.CheckGPUExceptions();
                                 meanGenLoss += genLoss[0];
                                 genSteps++;

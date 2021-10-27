@@ -464,7 +464,7 @@ namespace ParticleWGANDev
                         using (TorchTensor volumeMean = tensorRefVolume.Sum() / MaskSum)
                         using (TorchTensor volumeStd = (tensorRefVolume - volumeMean).Pow(2).Mean().Sqrt())
                         {
-                            tensorRefVolume = 10* volumeMask * (tensorRefVolume - volumeMean) / ((volumeStd + 1e-6) * (Dim));
+                            tensorRefVolume = 10 * volumeMask * (tensorRefVolume - volumeMean) / ((volumeStd + 1e-6) * (Dim));
                         }
                     }
                     ReconstructionWGANGenerator gen = Modules.ReconstructionWGANGenerator(tensorRefVolume, Dim, 10);
@@ -646,6 +646,8 @@ namespace ParticleWGANDev
 
                 List<ObservablePoint> LossPointsReal = new List<ObservablePoint>();
                 List<ObservablePoint> LossPointsFake = new List<ObservablePoint>();
+                List<ObservablePoint> GradNormDiscPoints = new List<ObservablePoint>();
+                List<ObservablePoint> GradNormGenPoints = new List<ObservablePoint>();
 
                 long IterationsDone = 0;
 
@@ -656,17 +658,24 @@ namespace ParticleWGANDev
 
                     if((IterationsDone+1)*BatchSize < 2 * numParticles)
                     {
-                        float clipVal = (float)((IterationsDone + 1) * BatchSize * (DiscIters + 1) * 1e8 / (2 * numParticles));
+                        double clipVal = (IterationsDone + 1) * BatchSize * (DiscIters + 1) * 1e8 / (2 * numParticles);
                         TrainModel.set_discriminator_grad_clip_val(clipVal);
+                        clipVal = (IterationsDone + 1) * BatchSize * (DiscIters + 1) * 1e4 / (2 * numParticles);
+                        TrainModel.set_generator_grad_clip_val(clipVal);
+
                     }
 
                     ReloadBlock.WaitOne();
                     
                     List<float> AllLossesReal = new List<float>();
                     List<float> AllLossesFake = new List<float>();
+                    List<float> AllGradNormDisc = new List<float>();
+                    List<float> AllGradNormGen = new List<float>();
                     float[] Loss = null;
                     float[] LossReal = null;
                     float[] LossFake = null;
+                    double gradNormDisc = 0.0d;
+                    double gradNormGen = 0.0d;
                     Image PredictionDisc = null;
                     Image PredictionGen = null;
                     Image PredictionGenNoisy = null;
@@ -687,26 +696,28 @@ namespace ParticleWGANDev
                                   CurrentLearningRate,
                                   out PredictionGen,
                                   out PredictionGenNoisy,
-                                  out Loss);
-
+                                  out Loss,
+                                  out gradNormGen);
+                                AllGradNormGen.Add((float)gradNormGen);
                             }
 
-                                TrainModel.TrainDiscriminatorParticle(ImagesAngles[DiscIters],
-                                      ImagesReal[DiscIters],
-                                      ImagesCTF[DiscIters],
-                                      CurrentLearningRate,
-                                      Lambda,
-                                      out PredictionDisc,
-                                      out Loss,
-                                      out LossReal,
-                                      out LossFake);
-                                AllLossesReal.Add(LossReal[0]);
-                                AllLossesFake.Add(LossFake[0]);
+                            TrainModel.TrainDiscriminatorParticle(ImagesAngles[DiscIters],
+                                  ImagesReal[DiscIters],
+                                  ImagesCTF[DiscIters],
+                                  CurrentLearningRate,
+                                  Lambda,
+                                  out PredictionDisc,
+                                  out Loss,
+                                  out LossReal,
+                                  out LossFake,
+                                  out gradNormDisc);
+                            AllLossesReal.Add(LossReal[0]);
+                            AllLossesFake.Add(LossFake[0]);
+                            AllGradNormDisc.Add((float)gradNormDisc);
 
                         }
                         else
                         {
-
                             for (int iterDisc = 0; iterDisc < DiscIters; iterDisc++)
                             {
 
@@ -718,25 +729,30 @@ namespace ParticleWGANDev
                                                                       out PredictionDisc,
                                                                       out Loss,
                                                                       out LossReal,
-                                                                      out LossFake);
+                                                                      out LossFake,
+                                                                      out gradNormDisc);
+                                AllGradNormDisc.Add((float)gradNormDisc);
                             }
                             AllLossesReal.Add(LossReal[0]);
                             AllLossesFake.Add(LossFake[0]);
 
-
                             if (TrainGen)
+                            {
                                 TrainModel.TrainGeneratorParticle(ImagesAngles[DiscIters], ImagesCTF[DiscIters], ImagesReal[DiscIters],
                                                                   CurrentLearningRate,
                                                                   out PredictionGen,
                                                                   out PredictionGenNoisy,
-                                                                  out Loss);
+                                                                  out Loss,
+                                                                  out gradNormGen);
+                                AllGradNormGen.Add((float)gradNormGen);
+                            }
                         }
                          HasBeenProcessed = true;
                     }
 
                     if (IterationsDone % 10 == 0)
                     {
-                        WriteToLog($"{MathHelper.Mean(AllLossesReal):F4}, {MathHelper.Mean(AllLossesFake):F4}");
+                        WriteToLog($"{MathHelper.Mean(AllLossesReal):#.##E+00}, {MathHelper.Mean(AllLossesFake):#.##E+00}, {MathHelper.Max(AllGradNormDisc):#.##E+00}, {MathHelper.Max(AllGradNormGen):#.##E+00}");
 
                         LossPointsReal.Add(new ObservablePoint(IterationsDone, MathHelper.Mean(AllLossesReal)));
                         Dispatcher.Invoke(() => SeriesLossReal.Values = new ChartValues<ObservablePoint>(LossPointsReal));
@@ -744,6 +760,11 @@ namespace ParticleWGANDev
                         LossPointsFake.Add(new ObservablePoint(IterationsDone, MathHelper.Mean(AllLossesFake)));
                         Dispatcher.Invoke(() => SeriesLossFake.Values = new ChartValues<ObservablePoint>(LossPointsFake));
 
+                        GradNormDiscPoints.Add(new ObservablePoint(IterationsDone, MathHelper.Max(AllGradNormDisc)));
+                        Dispatcher.Invoke(() => SeriesGradNorm.Values = new ChartValues<ObservablePoint>(GradNormDiscPoints));
+
+                        GradNormGenPoints.Add(new ObservablePoint(IterationsDone, MathHelper.Max(AllGradNormGen)));
+                        Dispatcher.Invoke(() => SeriesGradNormGen.Values = new ChartValues<ObservablePoint>(GradNormGenPoints));
                         //float2 GlobalMeanStd = MathHelper.MeanAndStd(ImagesReal[0].GetHost(Intent.Read)[0]);
 
                         Func<float[], float2, ImageSource> MakeImage = (data, stat) =>
