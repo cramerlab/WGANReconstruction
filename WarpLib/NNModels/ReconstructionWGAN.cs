@@ -56,15 +56,17 @@ namespace Warp.NNModels
         private float[] ResultLossDiscFake = new float[1];
 
         //private float sigmaShift = 0.5 * (2f / BoxDimensions.X);
-        private float sigmaShift = 0;
+        private double sigmaShift = 0;
 
         private bool IsDisposed = false;
 
         private double GenVolumeBoost = 10;
         private double GenBoost = 1;
-        private float generator_grad_clip_val = 10e8f;
-        private float discriminator_grad_clip_val = 10e8f;
+        private double generator_grad_clip_val = 1e4f;
+        private double discriminator_grad_clip_val = 1e8f;
         private double lambdaOutsideMask = 10;
+
+        public double SigmaShift { get => sigmaShift; set => sigmaShift = value; }
 
         public ReconstructionWGAN(int2 boxDimensions, int codeLength, int[] devices, int batchSize = 8, Image initialVolume = null)
         {
@@ -206,9 +208,16 @@ namespace Warp.NNModels
             return imageVolume;
         }
 
-        public void set_discriminator_grad_clip_val(float clip_val)
+
+
+        public void set_discriminator_grad_clip_val(double clip_val)
         {
             discriminator_grad_clip_val = clip_val;
+        }
+
+        public void set_generator_grad_clip_val(double clip_val)
+        {
+            generator_grad_clip_val = clip_val;
         }
         public void TrainGeneratorParticle(float[] angles,
                                            Image imagesCTF,
@@ -216,7 +225,8 @@ namespace Warp.NNModels
                                            float learningRate,
                                            out Image prediction,
                                            out Image predictionNoisy,
-                                           out float[] loss)
+                                           out float[] loss,
+                                           out double gradNorm)
         {
             OptimizerGen.SetLearningRateAdam(learningRate * GenBoost);
             OptimizerGenVolume.SetLearningRateAdam(learningRate * GenVolumeBoost);
@@ -224,7 +234,7 @@ namespace Warp.NNModels
 
             SyncParams();
             ResultPredicted.GetDevice(Intent.Write);
-
+            double thisGradNorm = 0.0d;
             Helper.ForCPU(0, NDevices, NDevices, null, (i, threadID) =>
             {
                 Generators[i].Train();
@@ -242,7 +252,7 @@ namespace Warp.NNModels
 
                 //TensorAngles[i].RandomNInPlace(TensorAngles[i].Shape);
                 //TensorAngles[i] *= 2 * Math.PI;
-                using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, sigmaShift))
+                using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, SigmaShift))
                 using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
                 using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
                 using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
@@ -294,10 +304,10 @@ namespace Warp.NNModels
                 {
                     penalty.Backward();
                 }*/
-                Generators[i].Clip_Gradients(generator_grad_clip_val);
+                thisGradNorm = Generators[i].Clip_Gradients(generator_grad_clip_val);
             }, null);
-            
 
+            gradNorm = thisGradNorm;
             GatherGrads();
 
             OptimizerGen.Step();
@@ -317,14 +327,15 @@ namespace Warp.NNModels
                                                out Image prediction,
                                                out float[] lossWasserstein,
                                                out float[] lossReal,
-                                               out float[] lossFake)
+                                               out float[] lossFake,
+                                               out double gradNorm)
         {
             OptimizerDisc.SetLearningRateAdam(learningRate);
             OptimizerDisc.ZeroGrad();
 
             SyncParams();
             ResultPredicted.GetDevice(Intent.Write);
-
+            double thisGradNorm = 0.0d;
             Helper.ForCPU(0, NDevices, NDevices, null, (i, threadID) =>
             {
                 Discriminators[i].Train();
@@ -363,7 +374,7 @@ namespace Warp.NNModels
                     //TensorAngles[i].RandomNInPlace(TensorAngles[i].Shape);
                     //TensorAngles[i] *= 2 * Math.PI;
                     GPU.CopyHostToDevice(angles, TensorAngles[i].DataPtr(), DeviceBatch * 3);
-                    using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, sigmaShift))
+                    using (TorchTensor Prediction = Generators[i].ForwardParticle(TensorParticleCode[i], TensorAngles[i], true, SigmaShift))
                     using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
                     using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
                     using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
@@ -401,9 +412,9 @@ namespace Warp.NNModels
                         }
                     }
                 }
-                Discriminators[i].Clip_Gradients(discriminator_grad_clip_val);
+                thisGradNorm = Discriminators[i].Clip_Gradients(discriminator_grad_clip_val);
             }, null);
-
+            gradNorm = thisGradNorm;
             GatherGrads();
 
             OptimizerDisc.Step();

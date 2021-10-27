@@ -300,8 +300,13 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
         //torch::Tensor result = ParticleDecoder->forward(code).reshape({ -1, 1, _boxsize, _boxsize });
 
         torch::Tensor trans_matrices = matrix_from_angles(angles);
-        torch::Tensor shifts = torch::randn({ angles.size(0), 3, 1 }, angles.options()) * sigmashift;
-        shifts = shifts.minimum(torch::ones_like(shifts)*sigmashift*3);
+        torch::Tensor shifts;
+        if (sigmashift > 0.0) {
+            shifts = torch::randn({ angles.size(0), 3, 1 }, angles.options()) * sigmashift;
+            shifts = shifts.minimum(torch::ones_like(shifts) * sigmashift * 3);
+        }
+        else
+            shifts = torch::zeros({ angles.size(0), 3, 1 }, angles.options());
         //auto dimShift = shifts.sizes().vec();
         //auto dimTransMat = trans_matrices.sizes().vec();
 
@@ -344,6 +349,11 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
          
         return fakeimages;
     }
+
+    torch::Tensor get_Volume() {
+        return _volume;
+    }
+
 };
 
 TORCH_MODULE(ReconstructionWGANGenerator);
@@ -481,7 +491,7 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
                 
 
                 Discriminator->push_back(torch::nn::Flatten(torch::nn::FlattenOptions()));
-                Discriminator->push_back(SpNormLinear(torch::nn::LinearOptions(1536, 10)));
+                Discriminator->push_back(SpNormLinear(torch::nn::LinearOptions(1536*9, 10)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
                 Discriminator->push_back(SpNormLinear(torch::nn::LinearOptions(10, 1)));
             }
@@ -511,7 +521,7 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
 
 
                 Discriminator->push_back(torch::nn::Flatten(torch::nn::FlattenOptions()));
-                Discriminator->push_back(torch::nn::Linear(torch::nn::LinearOptions(1536, 10)));
+                Discriminator->push_back(torch::nn::Linear(torch::nn::LinearOptions(1536*9, 10)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
                 Discriminator->push_back(torch::nn::Linear(torch::nn::LinearOptions(10, 1)));
             }
@@ -592,7 +602,7 @@ NNModule THSNN_ReconstructionWGANGenerator_ctor(Tensor volume, int64_t boxsize, 
 }
 
 double THSNN_ReconstructionWGANGenerator_clip_gradient(const NNModule module, const double clip_Value) {
-    return torch::nn::utils::clip_grad_norm_((*module)->as<ReconstructionWGANGeneratorImpl>()->parameters(), clip_Value, std::numeric_limits<double>::infinity());
+    return torch::nn::utils::clip_grad_norm_({ (*module)->as<ReconstructionWGANGeneratorImpl>()->get_Volume() }, clip_Value, std::numeric_limits<double>::infinity());
 }
 
 Tensor THSNN_ReconstructionWGANGenerator_forward_particle(const NNModule module, const Tensor code, const Tensor angles, const bool transform, const double sigmashift)

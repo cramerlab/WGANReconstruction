@@ -55,13 +55,14 @@ namespace ParticleWGANDev
         private string DirectoryReal = "particles";
         private string DirectoryFake = "sim";
 
-        private int Dim = 32;
+        private int Dim = 96;
         private int Dim_zoom = 96;
-
+        /*
         private double sigmaShiftPix = 0.5;
         private double sigmaShiftRel = 0.5d/( 32 / 2);
-
-
+        */
+        private double sigmaShiftPix = 0.0d;
+        private double sigmaShiftRel = 0.0d;
         private double LowPass = 1.0;
 
         private int BatchSize = 16;
@@ -441,7 +442,8 @@ namespace ParticleWGANDev
 
                     TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - Dim_zoom) / 2), new int3(Dim_zoom));
                     TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_region.mrc");
-                    TrefVolume = TrefVolume.AsScaled(new int3(Dim));
+                    if (Dim != Dim_zoom)
+                        TrefVolume = TrefVolume.AsScaled(new int3(Dim));
                     TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_scaled.mrc");
                     //TrefVolume.MaskSpherically(Dim / 2 + 2 * Dim / 8, Dim / 8, true);
                     TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_masked.mrc");
@@ -813,7 +815,11 @@ namespace ParticleWGANDev
                             TrainModel.Save(WorkingDirectory + @"ParticleWGAN_SN_" + datestring + ".pt");
                             var imageVolume = TrainModel.getVolume();
                             imageVolume.WriteMRC(WorkingDirectory + @"ParticleWGAN_SN_" + datestring + ".mrc", true);
-                            Image resized = imageVolume.AsScaled(new int3(Dim_zoom)).AsPadded(new int3(DimRaw));
+                            Image resized;
+                            if (Dim != Dim_zoom)
+                                resized = imageVolume.AsScaled(new int3(Dim_zoom)).AsPadded(new int3(DimRaw));
+                            else
+                                resized = imageVolume.AsPadded(new int3(DimRaw));
                             resized.WriteMRC(WorkingDirectory + @"ParticleWGAN_SN_" + datestring + "_resized.mrc", true);
 
                             resized.MaskSpherically(Dim / 2, Dim / 8, false);
@@ -823,7 +829,7 @@ namespace ParticleWGANDev
 
                             Dispatcher.Invoke(() => ButtonSave.IsEnabled = true);
 
-                            //if (ShouldSaveRecs)
+                            if (ShouldSaveRecs)
                             {
                                 Image.Stack(ImagesReal).WriteMRC(WorkingDirectory + @"ParticleWGAN_SN_" + datestring + "_real.mrc", true);
                                 Image.Stack(ImagesCTF).WriteMRC(WorkingDirectory + @"ParticleWGAN_SN_" + datestring + "_ctf.mrc", true);
