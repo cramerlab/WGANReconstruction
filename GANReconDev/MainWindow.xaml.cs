@@ -65,7 +65,7 @@ namespace ParticleWGANDev
         private double sigmaShiftRel = 0.0d;
         private double LowPass = 1.0;
 
-        private int BatchSize = 16;
+        private int BatchSize = 4;
         float Lambda = 0.001f;
         int DiscIters = 4;
         bool TrainGen = true;
