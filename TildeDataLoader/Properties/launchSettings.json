@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "TildeDataLoader": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}
