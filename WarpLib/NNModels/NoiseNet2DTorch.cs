@@ -162,17 +162,19 @@ namespace Warp
             {
                 UNetModel[i].Train();
                 UNetModel[i].ZeroGrad();
-
+                GPU.CheckGPUExceptions();
                 GPU.CopyDeviceToDevice(source.GetDeviceSlice(i * DeviceBatch, Intent.Read),
                                        TensorSource[i].DataPtr(),
                                        DeviceBatch * (int)BoxDimensions.Elements());
+                GPU.CheckGPUExceptions();
                 GPU.CopyDeviceToDevice(target.GetDeviceSlice(i * DeviceBatch, Intent.Read),
                                        TensorTarget[i].DataPtr(),
                                        DeviceBatch * (int)BoxDimensions.Elements());
+                GPU.CheckGPUExceptions();
                 GPU.CopyDeviceToDevice(ctf.GetDeviceSlice(i * DeviceBatch, Intent.Read),
                                        TensorCTF[i].DataPtr(),
                                        DeviceBatch * (int)(BoxDimensions * 2).ElementsFFT());
-
+                GPU.CheckGPUExceptions();
                 using (TorchTensor PredictionDeconv = UNetModel[i].Forward(TensorSource[i]))
                 using (TorchTensor PredictionDeconvPad = PredictionDeconv.Pad(new long[] { 128, 128, 128, 128}))
                 using (TorchTensor PredictionDeconvPadMask = PredictionDeconvPad.Mul(TensorMask[i]))
@@ -187,26 +189,30 @@ namespace Warp
                     GPU.CopyDeviceToDevice(Prediction2.DataPtr(),
                                            ResultPredicted.GetDeviceSlice(i * DeviceBatch, Intent.Write),
                                            DeviceBatch * (int)BoxDimensions.Elements());
+                    GPU.CheckGPUExceptions();
                     GPU.CopyDeviceToDevice(PredictionDeconv.DataPtr(),
                                            ResultPredictedDeconv.GetDeviceSlice(i * DeviceBatch, Intent.Write),
                                            DeviceBatch * (int)BoxDimensions.Elements());
+                    GPU.CheckGPUExceptions();
                     if (i == 0)
                         GPU.CopyDeviceToHost(PredictionLoss.DataPtr(), ResultLoss, 1);
+                    GPU.CheckGPUExceptions();
 
                     PredictionLoss.Backward();
                 }
             }, null);
 
             GatherGrads();
-
+            GPU.CheckGPUExceptions();
             if (NDevices > 1)
                 UNetModel[0].ScaleGrad(1f / NDevices);
-
+            GPU.CheckGPUExceptions();
             Optimizer.Step();
-
+            GPU.CheckGPUExceptions();
             prediction = ResultPredicted;
             predictionDeconv = ResultPredictedDeconv;
             loss = ResultLoss;
+            GPU.CheckGPUExceptions();
         }
 
         public void Save(string path)

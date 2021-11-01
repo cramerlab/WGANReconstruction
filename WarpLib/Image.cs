@@ -3415,6 +3415,23 @@ namespace Warp
                 }
             }
         }
+
+        public static List<Image> getObjectIDs()
+        {
+            lock (GlobalSync)
+            {
+                return LifetimeObjects;
+            }
+        }
+
+        public static HashSet<Image> getonDevice()
+        {
+            lock (GlobalSync)
+            {
+                return OnDeviceObjects;
+            }
+        }
+
     }
     
     [Flags]
