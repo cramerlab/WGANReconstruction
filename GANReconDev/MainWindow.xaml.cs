@@ -57,12 +57,13 @@ namespace ParticleWGANDev
 
         private int Dim = 96;
         private int Dim_zoom = 96;
-        /*
+        
         private double sigmaShiftPix = 0.5;
         private double sigmaShiftRel = 0.5d/( 32 / 2);
-        */
+        /*
         private double sigmaShiftPix = 0.0d;
         private double sigmaShiftRel = 0.0d;
+        */
         private double LowPass = 1.0;
 
         private int BatchSize = 4;
@@ -72,7 +73,7 @@ namespace ParticleWGANDev
 
         int NThreads = 3;
         int PreProcessingDevice = 0;
-        int ProcessingDevice = 0;
+        int ProcessingDevice = 1;
 
         public MainWindow()
         {
