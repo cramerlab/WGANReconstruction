@@ -67,9 +67,10 @@ namespace TorchSharp.NN
 
         public TorchTensor Forward(TorchTensor tensor)
         {
-            var norm = NormalizeProjection(tensor);
-            var res = THSNN_ReconstructionWGANDiscriminator_forward(handle, norm.Handle);
+            //var norm = NormalizeProjection(tensor);
+            var res = THSNN_ReconstructionWGANDiscriminator_forward(handle, tensor.Handle);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            //norm.Dispose();
             return new TorchTensor(res);
         }
 

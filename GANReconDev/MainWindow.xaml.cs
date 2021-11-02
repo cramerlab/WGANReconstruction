@@ -71,6 +71,7 @@ namespace ParticleWGANDev
         bool TrainGen = true;
 
         int NThreads = 3;
+        int PreProcessingDevice = 0;
         int ProcessingDevice = 0;
 
         public MainWindow()
@@ -373,16 +374,16 @@ namespace ParticleWGANDev
             Task.Run(() =>
             {
                 int seed = 42;
-                WriteToLog("Loading model... (" + GPU.GetFreeMemory(1) + " MB free)");
+                WriteToLog("Loading model... (" + GPU.GetFreeMemory(ProcessingDevice) + " MB free)");
                 Torch.SetSeed(seed);
                 //ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 32, new[] { 1 }, BatchSize);
                 //Image refVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
-                ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), 10, new[] { 1 }, BatchSize);
+                ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), 10, new[] { ProcessingDevice }, BatchSize);
                 TrainModel.SigmaShift = sigmaShiftRel;
                 //TrainModel.Load(@"D:\GAN_recon_polcompl\ParticleWGAN_SN_20210910_161349.pt");
-                WriteToLog("Done. (" + GPU.GetFreeMemory(1) + " MB free)");
+                WriteToLog("Done. (" + GPU.GetFreeMemory(ProcessingDevice) + " MB free)");
 
-                GPU.SetDevice(ProcessingDevice);
+                GPU.SetDevice(PreProcessingDevice);
 
                 Image[] ImagesReal = Helper.ArrayOfFunction(i => new Image(new int3(Dim, Dim, BatchSize)), DiscIters + 1);
                 Image[] ImagesCTF = Helper.ArrayOfFunction(i => new Image(new int3(Dim, Dim, BatchSize), true), DiscIters + 1);
@@ -437,7 +438,7 @@ namespace ParticleWGANDev
                 ParameterizedThreadStart ReloadLambda = (par) =>
                 {
                 //int par = 1;
-                    GPU.SetDevice(ProcessingDevice);
+                    GPU.SetDevice(PreProcessingDevice);
                     Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "cryosparc_P243_J525_003_volume_map.mrc"));
 
                     TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - Dim_zoom) / 2), new int3(Dim_zoom));
@@ -447,9 +448,9 @@ namespace ParticleWGANDev
                     TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_scaled.mrc");
                     //TrefVolume.MaskSpherically(Dim / 2 + 2 * Dim / 8, Dim / 8, true);
                     TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_masked.mrc");
-                    var tensorRefVolume = TensorExtensionMethods.ToTorchTensor(TrefVolume.GetHostContinuousCopy(), new long[] { 1, 1, Dim, Dim, Dim }).ToDevice(TorchSharp.DeviceType.CUDA, ProcessingDevice);
+                    var tensorRefVolume = TensorExtensionMethods.ToTorchTensor(TrefVolume.GetHostContinuousCopy(), new long[] { 1, 1, Dim, Dim, Dim }).ToDevice(TorchSharp.DeviceType.CUDA, PreProcessingDevice);
 
-                    using (TorchTensor volumeMask = Float32Tensor.Ones(new long[] { 1, Dim, Dim, Dim }, DeviceType.CUDA, ProcessingDevice))
+                    using (TorchTensor volumeMask = Float32Tensor.Ones(new long[] { 1, Dim, Dim, Dim }, DeviceType.CUDA, PreProcessingDevice))
                     {
 
                         Image Mask = new Image(new int3(Dim, Dim, Dim));
@@ -471,14 +472,14 @@ namespace ParticleWGANDev
                     }
                     ReconstructionWGANGenerator gen = Modules.ReconstructionWGANGenerator(tensorRefVolume, Dim, 10);
                     
-                    gen.ToCuda(ProcessingDevice);
+                    gen.ToCuda(PreProcessingDevice);
                     {
                         TorchTensor tensorVolume = gen.GetParameters()[0];
                         Image imageVolume = new Image(new int3(Dim));
                         GPU.CopyDeviceToDevice(tensorVolume.DataPtr(), imageVolume.GetDevice(Intent.Write), imageVolume.ElementsReal);
                         imageVolume.WriteMRC($@"{WorkingDirectory}\volumeInGenerator.mrc", true);
                     }
-                    var TensorAngles = Float32Tensor.Zeros(new long[] { BatchSize, 3 }, DeviceType.CUDA, ProcessingDevice);
+                    var TensorAngles = Float32Tensor.Zeros(new long[] { BatchSize, 3 }, DeviceType.CUDA, PreProcessingDevice);
 
                     //Projector refProjector = new Projector(refVolume, 2);
 
@@ -642,7 +643,7 @@ namespace ParticleWGANDev
                 for (int i = 0; i < NThreads; i++)
                     ReloadThreads[i].Start(i);
 
-                GPU.SetDevice(ProcessingDevice);
+                GPU.SetDevice(PreProcessingDevice);
 
                 Random Rand = new Random(123);
 
@@ -885,7 +886,7 @@ namespace ParticleWGANDev
             TrainModel.Load(WorkingDirectory + "ParticleWGAN_20210108_002634.pt");
             WriteToLog("Done. (" + GPU.GetFreeMemory(0) + " MB free)");
 
-            GPU.SetDevice(ProcessingDevice);
+            GPU.SetDevice(PreProcessingDevice);
 
             Image[] ImagesReal = null;
             Image[] ImagesFake = null;
@@ -926,7 +927,7 @@ namespace ParticleWGANDev
 
             ParameterizedThreadStart ReloadLambda = (par) =>
             {
-                GPU.SetDevice(ProcessingDevice);
+                GPU.SetDevice(PreProcessingDevice);
 
                 Random ReloadRand = new Random((int)par);
                 bool OwnBatchUsed = false;
@@ -1015,7 +1016,7 @@ namespace ParticleWGANDev
             TrainModel.Load(WorkingDirectory + "ParticleWGAN_20210111_210604.pt");
             WriteToLog("Done. (" + GPU.GetFreeMemory(0) + " MB free)");
 
-            GPU.SetDevice(ProcessingDevice);
+            GPU.SetDevice(PreProcessingDevice);
 
             Image[] ImagesReal = null;
             Image[] ImagesFake = null;
