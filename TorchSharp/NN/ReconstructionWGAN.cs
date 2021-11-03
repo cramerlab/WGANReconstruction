@@ -17,21 +17,21 @@ namespace TorchSharp.NN
         }
 
         [DllImport("LibTorchSharp")]
-        private static extern IntPtr THSNN_ReconstructionWGANGenerator_forward_noise(Module.HType module, IntPtr crapcode, IntPtr fakeimages, IntPtr ctf);
+        private static extern IntPtr THSNN_ReconstructionWGANGenerator_apply_noise(Module.HType module, IntPtr fakeimages, IntPtr ctf);
 
-        public TorchTensor ForwardNoise(TorchTensor crapcode, TorchTensor fakeimages, TorchTensor ctf)
+        public TorchTensor ApplyNoise(TorchTensor fakeimages, TorchTensor ctf)
         {
-            var res = THSNN_ReconstructionWGANGenerator_forward_noise(handle, crapcode.Handle, fakeimages.Handle, ctf.Handle);
+            var res = THSNN_ReconstructionWGANGenerator_apply_noise(handle, fakeimages.Handle, ctf.Handle);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }
 
         [DllImport("LibTorchSharp")]
-        private static extern IntPtr THSNN_ReconstructionWGANGenerator_forward_particle(Module.HType module, IntPtr code, IntPtr angles, bool transform, double sigmashift);
+        private static extern IntPtr THSNN_ReconstructionWGANGenerator_forward(Module.HType module, IntPtr angles, double sigmashift);
 
-        public TorchTensor ForwardParticle(TorchTensor code, TorchTensor angles, bool transform, double sigmashift)
+        public TorchTensor Forward(TorchTensor angles, double sigmashift)
         {
-            var res = THSNN_ReconstructionWGANGenerator_forward_particle(handle, code.Handle, angles.Handle, transform, sigmashift);
+            var res = THSNN_ReconstructionWGANGenerator_forward(handle, angles.Handle, sigmashift);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }
@@ -39,11 +39,11 @@ namespace TorchSharp.NN
     public static partial class Modules
     {
         [DllImport("LibTorchSharp")]
-        private static extern IntPtr THSNN_ReconstructionWGANGenerator_ctor(IntPtr volume, long boxsize, long codelength, out IntPtr pBoxedModule);
+        private static extern IntPtr THSNN_ReconstructionWGANGenerator_ctor(IntPtr volume, long boxsize, out IntPtr pBoxedModule);
 
-        static public ReconstructionWGANGenerator ReconstructionWGANGenerator(TorchTensor volume, long boxsize, long codelength)
+        static public ReconstructionWGANGenerator ReconstructionWGANGenerator(TorchTensor volume, long boxsize)
         {
-            var res = THSNN_ReconstructionWGANGenerator_ctor(volume.Handle, boxsize, codelength, out var boxedHandle);
+            var res = THSNN_ReconstructionWGANGenerator_ctor(volume.Handle, boxsize, out var boxedHandle);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new ReconstructionWGANGenerator(res, boxedHandle);
         }

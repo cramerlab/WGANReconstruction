@@ -33,7 +33,7 @@ namespace GANRecon
             int numEpochs = 1000;
             int discIters = 8;
 
-            var model = new ReconstructionWGAN(new int2(boxLength), 10, devices, batchSize);
+            var model = new ReconstructionWGAN(new int2(boxLength), devices, batchSize);
 
             Image imagesReal = new Image(new int3(boxLength, boxLength, batchSize));
             Image imagesCTF = new Image(new int3(boxLength, boxLength, batchSize), true, false);

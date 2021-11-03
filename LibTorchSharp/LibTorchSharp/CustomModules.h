@@ -24,14 +24,13 @@ EXPORT_API(Tensor)   THSNN_ParticleWGANDiscriminator_forward(const NNModule modu
 EXPORT_API(void)     THSNN_ParticleWGANDiscriminator_clipweights(const NNModule module, const double clip);
 EXPORT_API(Tensor)   THSNN_ParticleWGANDiscriminator_penalizegradient(const NNModule module, const Tensor real, const Tensor fake, const float lambda);
 
-EXPORT_API(NNModule) THSNN_ReconstructionWGANGenerator_ctor(Tensor volume, int64_t boxsize, int64_t codelength, NNAnyModule* outAsAnyModule);
-EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_forward_particle(const NNModule module, const Tensor code, const Tensor angles, const bool transform, const double sigmashift);
-EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_forward_noise(const NNModule module, const Tensor crapcode, const Tensor fakeimages, const Tensor ctf);
+EXPORT_API(NNModule) THSNN_ReconstructionWGANGenerator_ctor(Tensor volume, int64_t boxsize, NNAnyModule* outAsAnyModule);
+EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_forward(const NNModule module, const Tensor angles, const double sigmashift);
+EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_apply_noise(const NNModule module, const Tensor fakeimages, const Tensor ctf);
 EXPORT_API(double)     THSNN_ReconstructionWGANGenerator_clip_gradient(const NNModule module, const double clip_Value);
 
 EXPORT_API(NNModule) THSNN_ReconstructionWGANDiscriminator_ctor(NNAnyModule* outAsAnyModule);
 EXPORT_API(Tensor)   THSNN_ReconstructionWGANDiscriminator_forward(const NNModule module, const Tensor input);
-EXPORT_API(void)     THSNN_ReconstructionWGANDiscriminator_clipweights(const NNModule module, const double clip);
 EXPORT_API(Tensor)   THSNN_ReconstructionWGANDiscriminator_penalizegradient(const NNModule module, const Tensor real, const Tensor fake, const float lambda);
 EXPORT_API(double)   THSNN_ReconstructionWGANDiscriminator_clip_gradient(const NNModule module, const double clip_Value);
 
