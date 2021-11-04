@@ -234,22 +234,19 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
         return proj;
     }
 
-    torch::Tensor forward_normalized(torch::Tensor code, torch::Tensor angles, bool transform, double sigmashift)
+    torch::Tensor forward_normalized(torch::Tensor angles, torch::Tensor factor)
     {
         torch::Tensor trans_matrices = matrix_from_angles(angles);
         torch::Tensor shifts;
-        if (sigmashift > 0.0) {
-            shifts = torch::randn({ angles.size(0), 3, 1 }, angles.options()) * sigmashift;
-            shifts = shifts.minimum(torch::ones_like(shifts) * sigmashift * 3);
-        }
-        else
-            shifts = torch::zeros({ angles.size(0), 3, 1 }, angles.options());
 
+        shifts = torch::zeros({ angles.size(0), 3, 1 }, angles.options());
 
         trans_matrices = torch::cat({ trans_matrices, shifts }, 2);
         trans_matrices = trans_matrices.to(_volume.device());
+
+        torch::Tensor Volume = _volume * factor;
         torch::Tensor trans_grid = torch::nn::functional::affine_grid(trans_matrices, { angles.size(0), 1, _boxsize, _boxsize, _boxsize }, true);
-        torch::Tensor volumeRot = torch::nn::functional::grid_sample(_volume.size(0) < angles.size(0) ? _volume.expand(c10::IntArrayRef(new int64_t[]{ angles.size(0), -1, -1, -1, -1 }, 5)) : _volume,
+        torch::Tensor volumeRot = torch::nn::functional::grid_sample(Volume.size(0) < angles.size(0) ? Volume.expand(c10::IntArrayRef(new int64_t[]{ angles.size(0), -1, -1, -1, -1 }, 5)) : Volume,
             trans_grid, torch::nn::functional::GridSampleFuncOptions().padding_mode(torch::kZeros).align_corners(true));
 
         auto proj = volumeRot.sum(2);
@@ -427,6 +424,10 @@ double THSNN_ReconstructionWGANGenerator_clip_gradient(const NNModule module, co
 Tensor THSNN_ReconstructionWGANGenerator_forward(const NNModule module, const Tensor angles, const double sigmashift)
 {
     CATCH_TENSOR((*module)->as<ReconstructionWGANGeneratorImpl>()->forward(*angles, sigmashift));
+}
+Tensor THSNN_ReconstructionWGANGenerator_forward_normalized(const NNModule module, const Tensor angles, const Tensor factor)
+{
+    CATCH_TENSOR((*module)->as<ReconstructionWGANGeneratorImpl>()->forward_normalized(*angles, *factor));
 }
 
 Tensor THSNN_ReconstructionWGANGenerator_apply_noise(const NNModule module, const Tensor fakeimages, const Tensor ctf)
