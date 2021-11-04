@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using TorchSharp;
 using TorchSharp.NN;
 using TorchSharp.Tensor;
 using Warp;
@@ -32,42 +33,176 @@ namespace GANRecon
             int batchSize = 4;
             int numEpochs = 1000;
             int discIters = 8;
-
-            var model = new ReconstructionWGAN(new int2(boxLength), devices, batchSize);
-
-            Image imagesReal = new Image(new int3(boxLength, boxLength, batchSize));
-            Image imagesCTF = new Image(new int3(boxLength, boxLength, batchSize), true, false);
-            imagesCTF.Fill(1);
-            Random NoiseRand = new Random(42);
-            imagesReal.TransformValues(val =>
-            {
-                //https://stackoverflow.com/a/218600/5012099
-                double u1 = 1.0 - NoiseRand.NextDouble(); //uniform(0,1] random doubles
-                double u2 = 1.0 - NoiseRand.NextDouble();
-                double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) *
-                             Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
-                double randNormal = 0 + 1 * randStdNormal;
-                return (float)(val + randNormal);
-            });
-            float[] angles = Helper.ArrayOfFunction(i => 0.0f, 3 * batchSize);
-            for (int i = 0; i < 100; i++)
+            int PreProcessingDevice = 0;
+            int DimRaw = 128;
+            int Dim_zoom = 96;
+            int Dim = 96;
+            string WorkingDirectory = @"D:\GAN_recon_polcompl\";
+            float3[] RandomParticleAngles = Helper.GetHealpixAngles(3).Select(s => s * Helper.ToRad).ToArray();
             {
 
-                model.TrainDiscriminatorParticle(new float[3 * batchSize], imagesReal, imagesCTF, 1e-6f, 1e-4f, out Image prediction, out float[] lossWasserstein, out float[] lossReal, out float[] lossFake, out double gradNormDis);
-                model.TrainGeneratorParticle(new float[3 * batchSize], imagesCTF, imagesReal, 1e-6f, out Image predictionGen, out Image predictionNoisyGen, out float[] lossGen, out double gradNormGen);
-                prediction.Dispose();
-                if (i % 10 == 0)
+                GPU.SetDevice(PreProcessingDevice);
+                Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "cryosparc_P243_J525_003_volume_map.mrc"));
+
+                TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - Dim_zoom) / 2), new int3(Dim_zoom));
+
+                if (Dim != Dim_zoom)
+                    TrefVolume = TrefVolume.AsScaled(new int3(Dim));
+
+                TrefVolume.MaskSpherically(Dim / 2 + 2 * Dim / 8, Dim / 8, true);
+                var tensorRefVolume = TensorExtensionMethods.ToTorchTensor(TrefVolume.GetHostContinuousCopy(), new long[] { 1, 1, Dim, Dim, Dim }).ToDevice(TorchSharp.DeviceType.CUDA, PreProcessingDevice);
+
+                using (TorchTensor projMask = Float32Tensor.Ones(new long[] { 1, Dim, Dim }, DeviceType.CUDA, PreProcessingDevice))
                 {
-                    Console.WriteLine($"{i}%\t{lossWasserstein[0]}\t{lossReal[0]}\t{lossFake[0]}\t{gradNormDis}");
+
+                    Image Mask = new Image(new int3(Dim, Dim, 1));
+                    Mask.Fill(1);
+                    Mask.MaskSpherically(Dim / 2 + 2 * Dim / 8, Dim / 8, false);
+
+                    GPU.CopyDeviceToDevice(Mask.GetDevice(Intent.Read), projMask.DataPtr(), Mask.ElementsReal);
+
+                    Mask.Dispose();
+
+                    ReconstructionWGANGenerator gen = Modules.ReconstructionWGANGenerator(tensorRefVolume, Dim);
+                    int thisBatchSize = 64;
+                    TorchTensor TensorS = Float32Tensor.Ones(new long[] { 1 }, DeviceType.CUDA, PreProcessingDevice, true);
+
+                    using (TorchTensor MaskSum = projMask.Sum())
+                    using (TorchTensor angles = Float32Tensor.Zeros(new long[] { thisBatchSize, 3 }, DeviceType.CUDA, PreProcessingDevice))
+                    {
+                        {
+                            float3[] theseAngles = RandomParticleAngles.Take(thisBatchSize).ToArray();
+                            float[] theseAnglesInterleaved = Helper.ToInterleaved(theseAngles);
+                            GPU.CopyHostToDevice(theseAnglesInterleaved, angles.DataPtr(), thisBatchSize * 3);
+
+
+                            /*calculate stdDev of proj within circular mask projMask, then penalize deviation from 1*/
+                            using (TorchTensor proj = gen.Forward(angles, 0.0d))
+                            using (TorchTensor maskedProj = proj * projMask)
+                            using (TorchTensor maskedProjSum = maskedProj.Sum(new long[] { 2, 3 }, true))
+                            using (TorchTensor maskedProjMean = maskedProjSum / MaskSum)
+                            using (TorchTensor maskedProjStd = ((maskedProj - maskedProjMean).Pow(2) * maskedProj).Sum(new long[] { 2, 3 }) / MaskSum)
+                            using(TorchTensor mean = maskedProjStd.Mean())
+                            using (TorchTensor rec = mean.Pow(-1))
+                            {
+                                //s = maskedProjStd.Mean().Detach().RequiresGrad(true);
+                                GPU.CopyDeviceToDevice(rec.DataPtr(), TensorS.DataPtr(), 1);
+                                GPU.CheckGPUExceptions();
+                                float[] buffer = new float[1];
+                                GPU.CopyDeviceToHost(TensorS.DataPtr(), buffer, 1);
+                                GPU.CheckGPUExceptions();
+                                Console.WriteLine($"s: {buffer[0]}");
+                            }
+
+                            {
+                                float[] bufferS = new float[1];
+                                GPU.CopyDeviceToHost(TensorS.DataPtr(), bufferS, 1);
+                                GPU.CheckGPUExceptions();
+                                Console.WriteLine($"s: {bufferS[0]}");
+                            }
+                         }
+                        int memorySize = 100;
+                        int memoryPos = 0;
+                        float[] lastSValues = new float[memorySize];
+                        bool full = false;
+                        Optimizer optim = Optimizer.Adam(new List<TorchTensor> { TensorS }, 0.01, 1e-6);
+                        for (int i = 0; i < 10; i++)
+                        {
+                            
+                            float[] losses = new float[(int)(RandomParticleAngles.Length / thisBatchSize)];
+ 
+                            int batchIdx = 0;
+                            for (int offset = 0; RandomParticleAngles.Length - offset > thisBatchSize; offset += thisBatchSize)
+                            {
+                                optim.ZeroGrad();
+                                float3[] theseAngles = RandomParticleAngles.Skip(offset).Take(thisBatchSize).ToArray();
+                                float[] theseAnglesInterleaved = Helper.ToInterleaved(theseAngles);
+                                GPU.CopyHostToDevice(theseAnglesInterleaved, angles.DataPtr(), thisBatchSize * 3);
+                                
+
+                                /*calculate stdDev of proj within circular mask projMask, then penalize deviation from 1*/
+                                using (TorchTensor proj = gen.Forward_Normalized(angles, TensorS))
+                                using (TorchTensor maskedProj = proj * projMask)
+                                using (TorchTensor maskedProjSum = maskedProj.Sum(new long[] { 2, 3 }, true))
+                                using (TorchTensor maskedProjMean = maskedProjSum / MaskSum)
+                                using (TorchTensor maskedProjStd = ((maskedProj - maskedProjMean).Pow(2) * maskedProj).Sum(new long[] { 2, 3 }) / MaskSum)
+                                using (TorchTensor TensorLoss = (maskedProjStd - 0.1).Pow(2).Mean())
+                                {
+
+                                    TensorLoss.Backward();
+                                    optim.Step();
+
+                                    float[] buffer = new float[1];
+                                    GPU.CopyDeviceToHost(TensorLoss.DataPtr(), buffer, 1);
+                                    float loss = buffer[0];
+ 
+                                    GPU.CopyDeviceToHost(TensorS.DataPtr(), buffer, 1);
+                                    float s = buffer[0];
+
+                                    losses[batchIdx] = loss;
+                                    lastSValues[memoryPos] = s;
+                                    if(memoryPos == memorySize - 1)
+                                    {
+                                        full = true;
+                                        memoryPos = 0;
+                                    }
+                                    else
+                                    {
+                                        memoryPos++;
+                                    }
+                                    Console.WriteLine($"Loss: {loss}\ts: {s}");
+                                    if (full && (Math.Abs(((MathHelper.Mean(lastSValues) - s) / s)) < 1e-2))
+                                    {
+                                        Console.WriteLine($"Final S: {s}");
+                                        return;
+                                    }
+                                }
+                                batchIdx++;
+                            }
+                        }
+                    }
                 }
-                prediction.Dispose();
-                predictionGen.Dispose();
-                predictionNoisyGen.Dispose();
+
 
 
             }
 
-            Console.WriteLine($"Done");
+        /*
+        var model = new ReconstructionWGAN(new int2(boxLength), devices, batchSize);
+
+        Image imagesReal = new Image(new int3(boxLength, boxLength, batchSize));
+        Image imagesCTF = new Image(new int3(boxLength, boxLength, batchSize), true, false);
+        imagesCTF.Fill(1);
+        Random NoiseRand = new Random(42);
+        imagesReal.TransformValues(val =>
+        {
+            //https://stackoverflow.com/a/218600/5012099
+            double u1 = 1.0 - NoiseRand.NextDouble(); //uniform(0,1] random doubles
+            double u2 = 1.0 - NoiseRand.NextDouble();
+            double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) *
+                         Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
+            double randNormal = 0 + 1 * randStdNormal;
+            return (float)(val + randNormal);
+        });
+        float[] angles = Helper.ArrayOfFunction(i => 0.0f, 3 * batchSize);
+        for (int i = 0; i < 100; i++)
+        {
+
+            model.TrainDiscriminatorParticle(new float[3 * batchSize], imagesReal, imagesCTF, 1e-6f, 1e-4f, out Image prediction, out float[] lossWasserstein, out float[] lossReal, out float[] lossFake, out double gradNormDis);
+            model.TrainGeneratorParticle(new float[3 * batchSize], imagesCTF, imagesReal, 1e-6f, out Image predictionGen, out Image predictionNoisyGen, out float[] lossGen, out double gradNormGen);
+            prediction.Dispose();
+            if (i % 10 == 0)
+            {
+                Console.WriteLine($"{i}%\t{lossWasserstein[0]}\t{lossReal[0]}\t{lossFake[0]}\t{gradNormDis}");
+            }
+            prediction.Dispose();
+            predictionGen.Dispose();
+            predictionNoisyGen.Dispose();
+
+
+        }
+        */
+        Console.WriteLine($"Done");
             //var NoiseNet = new NoiseNet2DTorch(boxsize, devices, batchSize);
 
             //Read all particles and CTF information into memory

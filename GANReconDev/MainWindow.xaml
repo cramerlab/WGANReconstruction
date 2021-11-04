@@ -27,7 +27,6 @@
         <Image Name="ImagePrediction" Grid.Column="1" Grid.Row="1" Width="256" Height="256" />
 
         <StackPanel Grid.Column="2" Grid.Row="0" Grid.RowSpan="2" Orientation="Vertical">
-            <Button Name="ButtonStartNoise" Content="Run noise" Margin="10" Click="ButtonStartNoise_OnClick" />
             <Button Name="ButtonStartParticle" Content="Run particle" Margin="10" Click="ButtonStartParticle_OnClick" />
             <Button Name="ButtonSave" Content="Save" Margin="10" Click="ButtonSave_OnClick" />
             <Button Name="ButtonTest" Content="Test" Margin="10" Click="ButtonTest_OnClick" />
