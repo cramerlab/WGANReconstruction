@@ -181,7 +181,9 @@ namespace ParticleWGANDev
 
                         tensorRefVolume *= volumeMask;
                         {
-                            tensorRefVolume = tensorRefVolume * 0.016208189; //SNR approx 0.1
+                            //tensorRefVolume = tensorRefVolume * 0.016208189; //SNR approx 0.1
+                            tensorRefVolume = tensorRefVolume * 0.018901046; //SNR approx 0.1
+
                         }
                     }
                     ReconstructionWGANGenerator gen = Modules.ReconstructionWGANGenerator(tensorRefVolume, Dim);

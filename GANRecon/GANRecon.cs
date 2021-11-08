@@ -57,7 +57,7 @@ namespace GANRecon
 
                     Image Mask = new Image(new int3(Dim, Dim, 1));
                     Mask.Fill(1);
-                    Mask.MaskSpherically(Dim / 2 + 2 * Dim / 8, Dim / 8, false);
+                    //Mask.MaskSpherically(Dim / 2 + 2 * Dim / 8, Dim / 8, false);
 
                     GPU.CopyDeviceToDevice(Mask.GetDevice(Intent.Read), projMask.DataPtr(), Mask.ElementsReal);
 

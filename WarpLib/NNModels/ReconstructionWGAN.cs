@@ -53,7 +53,7 @@ namespace Warp.NNModels
 
         private bool IsDisposed = false;
 
-        private double GenVolumeBoost = 10;
+        private double GenVolumeBoost = 1;
         private double GenBoost = 1;
         private double generator_grad_clip_val = 1e4f;
         private double discriminator_grad_clip_val = 1e8f;
@@ -236,11 +236,11 @@ namespace Warp.NNModels
                 //using (TorchTensor PredictionIFFT = PredictionFT.irfftn(new long[] { 2, 3 }))
                 using (TorchTensor PredictionNoisy = Generators[i].ApplyNoise(PredictionConv, TensorCTF[i]))
                 //using (TorchTensor PredictionNoisy = PredictionConv)
-                //using (TorchTensor mean = PredictionNoisy.Mean(new long[] { 2, 3 }, true)) 
-                //using (TorchTensor std = PredictionNoisy.Std(new long[] { 2, 3 }, true, true))
-                //using (TorchTensor normalized = (PredictionNoisy - mean)/(std+1e-4))
+                using (TorchTensor mean = PredictionNoisy.Mean(new long[] { 2, 3 }, true)) 
+                using (TorchTensor std = PredictionNoisy.Std(new long[] { 2, 3 }, true, true))
+                using (TorchTensor normalized = (PredictionNoisy - mean)/(std+1e-4))
                 //using (TorchTensor PredictionMasked = PredictionNoisy.Mul(TensorMask[i]))
-                using (TorchTensor IsItReal = Discriminators[i].Forward(PredictionNoisy))
+                using (TorchTensor IsItReal = Discriminators[i].Forward(normalized))
                 //using (TorchTensor IsItReal = TensorTrueImages[i] - PredictionMasked)
                 //using (TorchTensor error = IsItReal.Pow(2))
                 //using (TorchTensor Loss = error.Mean())
@@ -357,7 +357,7 @@ namespace Warp.NNModels
 
 
                         
-                        using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(TensorTrueImages[i], PredictionNoisy, penaltyLambda))
+                        using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(TrueImageNormalized, PredictionNoisyNormalized, penaltyLambda))
                         {
                             LossReal.Backward();
                             LossFake.Backward();
