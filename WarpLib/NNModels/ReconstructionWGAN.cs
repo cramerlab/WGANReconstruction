@@ -109,7 +109,7 @@ namespace Warp.NNModels
                 }
 
                 TensorMask[i] = Float32Tensor.Ones(new long[] { 1, 1, BoxDimensions.Y, BoxDimensions.X }, DeviceType.CUDA, DeviceID);
-                /*{
+                {
                     Image Mask = new Image(new int3(BoxDimensions.X, BoxDimensions.Y, 1));
                     Mask.Fill(1);
                     Mask.MaskSpherically(BoxDimensions.X / 2, BoxDimensions.X / 8, false);
@@ -117,7 +117,7 @@ namespace Warp.NNModels
                     GPU.CopyDeviceToDevice(Mask.GetDevice(Intent.Read), TensorMask[i].DataPtr(), Mask.ElementsReal);
 
                     Mask.Dispose();
-                }*/
+                }
                 TensorVolumeMask[i] = Float32Tensor.Ones(new long[] { 1, BoxDimensions.X, BoxDimensions.Y, BoxDimensions.X }, DeviceType.CUDA, DeviceID);
                 {
                     Image Mask = new Image(new int3(BoxDimensions.X, BoxDimensions.Y, BoxDimensions.X));
@@ -258,7 +258,7 @@ namespace Warp.NNModels
 
                     Loss.Backward(TensorOne[i]);
                 }
-                /*
+                
                 using (TorchTensor thisVolume = Generators[i].GetParameters()[0])
                 using (TorchTensor maskInv = (-1) * TensorVolumeMask[i] + 1)
                 using (TorchTensor outsideMask = thisVolume * maskInv)
@@ -267,7 +267,7 @@ namespace Warp.NNModels
                 using (TorchTensor penalty = penaltyAbs.Sum())
                 {
                     penalty.Backward();
-                }*/
+                }
                 thisGradNorm = Generators[i].Clip_Gradients(generator_grad_clip_val);
             }, null);
 

@@ -36,7 +36,7 @@ namespace GANRecon
             int PreProcessingDevice = 0;
             int DimRaw = 128;
             int Dim_zoom = 96;
-            int Dim = 96;
+            int Dim = 32;
             string WorkingDirectory = @"D:\GAN_recon_polcompl\";
             float3[] RandomParticleAngles = Helper.GetHealpixAngles(3).Select(s => s * Helper.ToRad).ToArray();
             {
