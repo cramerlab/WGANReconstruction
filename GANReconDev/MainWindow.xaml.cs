@@ -55,8 +55,8 @@ namespace ParticleWGANDev
         private string DirectoryReal = "particles";
         private string DirectoryFake = "sim";
 
-        private int Dim = 96;
-        private int Dim_zoom = 96;
+        private int Dim = 128;
+        private int Dim_zoom = 128;
         
         private double sigmaShiftPix = 0.5;
         private double sigmaShiftRel = 0.5d/( 32 / 2);
@@ -73,7 +73,7 @@ namespace ParticleWGANDev
 
         int NThreads = 3;
         int PreProcessingDevice = 0;
-        int ProcessingDevice = 1;
+        int ProcessingDevice = 0;
 
         public MainWindow()
         {
@@ -157,8 +157,8 @@ namespace ParticleWGANDev
                 //int par = 1;
                     GPU.SetDevice(PreProcessingDevice);
                     Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "cryosparc_P243_J525_003_volume_map.mrc"));
-
-                    TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - Dim_zoom) / 2), new int3(Dim_zoom));
+                    if (Dim_zoom != DimRaw)
+                        TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - Dim_zoom) / 2), new int3(Dim_zoom));
                     TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_region.mrc");
                     if (Dim != Dim_zoom)
                         TrefVolume = TrefVolume.AsScaled(new int3(Dim));
@@ -182,7 +182,9 @@ namespace ParticleWGANDev
                         tensorRefVolume *= volumeMask;
                         {
                             //tensorRefVolume = tensorRefVolume * 0.016208189; //SNR approx 0.1
-                            tensorRefVolume = tensorRefVolume * 0.018901046; //SNR approx 0.1 box 96
+
+                            //tensorRefVolume = tensorRefVolume * 0.018901046; //SNR approx 0.1 box 96
+                            tensorRefVolume = tensorRefVolume * 0.12979217; //SNR approx 0.1 box 96
                             //tensorRefVolume = tensorRefVolume * 0.060167417; //SNR approx 0.1 box 32
 
 
@@ -529,9 +531,12 @@ namespace ParticleWGANDev
                             imageVolume.WriteMRC(WorkingDirectory + @"ParticleWGAN_SN_" + datestring + ".mrc", true);
                             Image resized;
                             if (Dim != Dim_zoom)
-                                resized = imageVolume.AsScaled(new int3(Dim_zoom)).AsPadded(new int3(DimRaw));
+                                resized = imageVolume.AsScaled(new int3(Dim_zoom));
                             else
-                                resized = imageVolume.AsPadded(new int3(DimRaw));
+                                resized = imageVolume;
+
+                            if (Dim_zoom != DimRaw)
+                                resized = resized.AsPadded(new int3(Dim_zoom));
                             resized.WriteMRC(WorkingDirectory + @"ParticleWGAN_SN_" + datestring + "_resized.mrc", true);
 
                             resized.MaskSpherically(Dim / 2, Dim / 8, false);

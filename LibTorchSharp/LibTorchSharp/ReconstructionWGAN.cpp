@@ -322,6 +322,9 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
                 Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
                 
+                Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(1536, 3072, 3).stride(1).padding(1)));
+                Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
+                Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
 
                 Discriminator->push_back(torch::nn::Flatten(torch::nn::FlattenOptions()));
                 Discriminator->push_back(SpNormLinear(torch::nn::LinearOptions(1536*9, 10)));
@@ -352,11 +355,15 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
                 Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
 
-
+                Discriminator->push_back(torch::nn::Conv2d(torch::nn::Conv2dOptions(1536, 3072, 3).stride(1).padding(1)));
+                Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
+                Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
+                
                 Discriminator->push_back(torch::nn::Flatten(torch::nn::FlattenOptions()));
-                Discriminator->push_back(torch::nn::Linear(torch::nn::LinearOptions(1536*9, 10)));
+                Discriminator->push_back(torch::nn::Linear(torch::nn::LinearOptions(3072*4, 10)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
                 Discriminator->push_back(torch::nn::Linear(torch::nn::LinearOptions(10, 1)));
+                
             }
 
 
@@ -368,6 +375,7 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
     torch::Tensor forward(torch::Tensor image)
     {
         auto out = Discriminator->forward(image);
+        //auto dims = out.sizes().vec();
         return out;
     }
 

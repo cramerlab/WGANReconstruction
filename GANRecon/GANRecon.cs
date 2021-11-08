@@ -126,7 +126,7 @@ namespace GANRecon
                                 using (TorchTensor maskedProjSum = maskedProj.Sum(new long[] { 2, 3 }, true))
                                 using (TorchTensor maskedProjMean = maskedProjSum / MaskSum)
                                 using (TorchTensor maskedProjStd = ((maskedProj - maskedProjMean).Pow(2) * maskedProj).Sum(new long[] { 2, 3 }) / MaskSum)
-                                using (TorchTensor TensorLoss = (maskedProjStd - 0.1).Pow(2).Mean())
+                                using (TorchTensor TensorLoss = (maskedProjStd - 1).Pow(2).Mean())
                                 {
 
                                     TensorLoss.Backward();
