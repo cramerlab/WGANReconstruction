@@ -159,12 +159,13 @@ namespace ParticleWGANDev
                     Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "cryosparc_P243_J525_003_volume_map.mrc"));
 
                     TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - Dim_zoom) / 2), new int3(Dim_zoom));
-                    TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_region.mrc");
+                    //TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_region.mrc");
                     if (Dim != Dim_zoom)
                         TrefVolume = TrefVolume.AsScaled(new int3(Dim));
-                    TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_scaled.mrc");
+                    //TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_scaled.mrc");
                     //TrefVolume.MaskSpherically(Dim / 2 + 2 * Dim / 8, Dim / 8, true);
-                    TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_masked.mrc");
+                    //TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_masked.mrc");
+                    /*
                     var tensorRefVolume = TensorExtensionMethods.ToTorchTensor(TrefVolume.GetHostContinuousCopy(), new long[] { 1, 1, Dim, Dim, Dim }).ToDevice(TorchSharp.DeviceType.CUDA, PreProcessingDevice);
 
                     using (TorchTensor volumeMask = Float32Tensor.Ones(new long[] { 1, Dim, Dim, Dim }, DeviceType.CUDA, PreProcessingDevice))
@@ -191,7 +192,8 @@ namespace ParticleWGANDev
                     ReconstructionWGANGenerator gen = Modules.ReconstructionWGANGenerator(tensorRefVolume, Dim);
                     
                     gen.ToCuda(PreProcessingDevice);
-
+                    */
+                    var TProj = new Projector(TrefVolume, 2);
                     var TensorAngles = Float32Tensor.Zeros(new long[] { BatchSize, 3 }, DeviceType.CUDA, PreProcessingDevice);
 
                     Random ReloadRand = new Random((int)par);
@@ -260,15 +262,17 @@ namespace ParticleWGANDev
                                 float3[] theseAngles = Helper.IndexedSubset(RandomParticleAngles, AngleIds);
                                 TImagesAngles[iterTrain] = Helper.ToInterleaved(theseAngles);
                                 GPU.CopyHostToDevice(TImagesAngles[iterTrain], TensorAngles.DataPtr(), TImagesAngles[iterTrain].Length);
-                                using (var projected = gen.Forward(TensorAngles, sigmaShiftRel)) 
+                                /*using (var projected = gen.Forward(TensorAngles, sigmaShiftRel)) 
                                 {
                                     GPU.CopyDeviceToDevice(projected.DataPtr(), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
                                     //TImagesReal[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_TImagesReal[{iterTrain}]_afterProj.mrc", true);
-                                }
+                                }*/
+                                Image projected = TProj.ProjectToRealspace(new int2(Dim), theseAngles);
+                                GPU.CopyDeviceToDevice(projected.GetDevice(Intent.Read), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
                                 GPU.CheckGPUExceptions();
                                 //TImagesReal[iterTrain] = refProjector.ProjectToRealspace(new int2(Dim), Helper.ArrayOfFunction(i => 
                                 //        new float3((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble()) * ((float)Math.PI * 2), BatchSize));
-
+                                //TImagesReal[iterTrain].MaskSpherically((int)(2.0*Dim / 3+1.0/10*Dim), Dim / 8, false);
                                 GPU.CreateCTF(TImagesCTF[iterTrain].GetDevice(Intent.Write),
                                               CTFCoords.GetDevice(Intent.Read),
                                               IntPtr.Zero,
