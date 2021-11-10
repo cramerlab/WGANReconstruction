@@ -156,7 +156,7 @@ namespace ParticleWGANDev
                 {
                 //int par = 1;
                     GPU.SetDevice(PreProcessingDevice);
-                    Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "cryosparc_P243_J525_003_volume_map.mrc"));
+                    Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "cryosparc_P682_J50_003_reconstruction.mrc"));
 
                     TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - Dim_zoom) / 2), new int3(Dim_zoom));
                     //TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_region.mrc");
