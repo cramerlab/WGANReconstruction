@@ -269,6 +269,7 @@ namespace ParticleWGANDev
                                 }*/
                                 Image projected = TProj.ProjectToRealspace(new int2(Dim), theseAngles);
                                 GPU.CopyDeviceToDevice(projected.GetDevice(Intent.Read), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
+                                projected.Dispose();
                                 GPU.CheckGPUExceptions();
                                 //TImagesReal[iterTrain] = refProjector.ProjectToRealspace(new int2(Dim), Helper.ArrayOfFunction(i => 
                                 //        new float3((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble()) * ((float)Math.PI * 2), BatchSize));
