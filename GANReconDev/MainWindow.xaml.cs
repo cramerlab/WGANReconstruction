@@ -66,7 +66,7 @@ namespace ParticleWGANDev
         */
         private double LowPass = 1.0;
 
-        private int BatchSize = 32;
+        private int BatchSize = 16;
         float Lambda = 0.001f;
         int DiscIters = 8;
         bool TrainGen = true;
@@ -156,7 +156,7 @@ namespace ParticleWGANDev
                 {
                 //int par = 1;
                     GPU.SetDevice(PreProcessingDevice);
-                    Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "cryosparc_P682_J50_003_reconstruction.mrc"));
+                    Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "Refine3D_CryoSparcSelected_run_class001.mrc"));
                     if (Dim_zoom != DimRaw)
                         TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - Dim_zoom) / 2), new int3(Dim_zoom));
                     //TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_region.mrc");
@@ -315,7 +315,7 @@ namespace ParticleWGANDev
                                     double u2 = 1.0 - NoiseRand.NextDouble();
                                     double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) *
                                                  Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
-                                    double randNormal = 0 + 1 * randStdNormal;
+                                    double randNormal = 0 + 0.5 * randStdNormal;
                                     return (float)(val + randNormal);
                                 });
 
