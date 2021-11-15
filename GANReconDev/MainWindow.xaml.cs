@@ -66,13 +66,13 @@ namespace ParticleWGANDev
         */
         private double LowPass = 1.0;
 
-        private int BatchSize = 4;
+        private int BatchSize = 32;
         float Lambda = 0.001f;
-        int DiscIters = 4;
+        int DiscIters = 8;
         bool TrainGen = true;
 
         int NThreads = 3;
-        int PreProcessingDevice = 0;
+        int PreProcessingDevice = 1;
         int ProcessingDevice = 0;
 
         public MainWindow()
@@ -156,10 +156,10 @@ namespace ParticleWGANDev
                 {
                 //int par = 1;
                     GPU.SetDevice(PreProcessingDevice);
-                    Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "cryosparc_P243_J525_003_volume_map.mrc"));
+                    Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "cryosparc_P682_J50_003_reconstruction.mrc"));
                     if (Dim_zoom != DimRaw)
                         TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - Dim_zoom) / 2), new int3(Dim_zoom));
-                    TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_region.mrc");
+                    //TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_region.mrc");
                     if (Dim != Dim_zoom)
                         TrefVolume = TrefVolume.AsScaled(new int3(Dim));
                     //TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_scaled.mrc");

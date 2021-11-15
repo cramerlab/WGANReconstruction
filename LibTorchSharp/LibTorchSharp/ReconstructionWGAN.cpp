@@ -377,7 +377,7 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
     torch::Tensor forward(torch::Tensor image)
     {
         auto out = Discriminator->forward(image);
-        //auto dims = out.sizes().vec();
+        auto dims = out.sizes().vec();
         return out;
     }
 

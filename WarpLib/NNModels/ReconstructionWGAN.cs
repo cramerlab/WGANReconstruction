@@ -110,13 +110,13 @@ namespace Warp.NNModels
 
                 TensorMask[i] = Float32Tensor.Ones(new long[] { 1, 1, BoxDimensions.Y, BoxDimensions.X }, DeviceType.CUDA, DeviceID);
                 {
-                    Image Mask = new Image(new int3(BoxDimensions.X, BoxDimensions.Y, 1));
+                    /*Image Mask = new Image(new int3(BoxDimensions.X, BoxDimensions.Y, 1));
                     Mask.Fill(1);
                     Mask.MaskSpherically(BoxDimensions.X / 2, BoxDimensions.X / 8, false);
 
                     GPU.CopyDeviceToDevice(Mask.GetDevice(Intent.Read), TensorMask[i].DataPtr(), Mask.ElementsReal);
 
-                    Mask.Dispose();
+                    Mask.Dispose();*/
                 }
                 TensorVolumeMask[i] = Float32Tensor.Ones(new long[] { 1, BoxDimensions.X, BoxDimensions.Y, BoxDimensions.X }, DeviceType.CUDA, DeviceID);
                 {
@@ -239,7 +239,9 @@ namespace Warp.NNModels
                 using (TorchTensor PredictionNoisyMean = PredictionNoisy.Mean(new long[] { 2, 3 }, true)) 
                 using (TorchTensor PredictionNoisyStd = PredictionNoisy.Std(new long[] { 2, 3 }, true, true))
                 using (TorchTensor PredictionNoisyNormalized = (PredictionNoisy - PredictionNoisyMean) /(PredictionNoisyStd + 1e-4))
-                using (TorchTensor PredictionNoisyMasked = PredictionNoisyNormalized.Mul(TensorMask[i]))
+                //using (TorchTensor PredictionNoisyMasked = PredictionNoisyNormalized.Mul(TensorMask[i]))
+                using (TorchTensor PredictionNoisyMasked = PredictionNoisyNormalized)
+                
                 using (TorchTensor IsItReal = Discriminators[i].Forward(PredictionNoisyMasked))
                 using (TorchTensor Loss = ((-1) * IsItReal).Mean())
                 {
@@ -255,7 +257,7 @@ namespace Warp.NNModels
 
                     Loss.Backward(TensorOne[i]);
                 }
-                
+                /*
                 using (TorchTensor thisVolume = Generators[i].GetParameters()[0])
                 using (TorchTensor maskInv = (-1) * TensorVolumeMask[i] + 1)
                 using (TorchTensor outsideMask = thisVolume * maskInv)
@@ -264,7 +266,7 @@ namespace Warp.NNModels
                 using (TorchTensor penalty = penaltyAbs.Sum())
                 {
                     penalty.Backward();
-                }
+                }*/
                 thisGradNorm = Generators[i].Clip_Gradients(generator_grad_clip_val);
             }, null);
 
@@ -314,7 +316,8 @@ namespace Warp.NNModels
                 using (TorchTensor TrueImageMean = TensorTrueImages[i].Mean(new long[] { 2, 3 }, true))
                 using (TorchTensor TrueImageStd = TensorTrueImages[i].Std(new long[] { 2, 3 }, true, true))
                 using (TorchTensor TrueImageNormalized = (TensorTrueImages[i] - TrueImageMean) / (TrueImageStd + 1e-4))
-                using (TorchTensor TrueMasked = TrueImageNormalized.Mul(TensorMask[i]))
+                //using (TorchTensor TrueMasked = TrueImageNormalized.Mul(TensorMask[i]))
+                using (TorchTensor TrueMasked = TrueImageNormalized)
                 using (TorchTensor IsTrueReal = Discriminators[i].Forward(TrueMasked))
                 using (TorchTensor IsTrueRealNeg = IsTrueReal * (-1))
                 using (TorchTensor LossReal = IsTrueRealNeg.Mean())
@@ -334,7 +337,8 @@ namespace Warp.NNModels
                     using (TorchTensor PredictionNoisyMean = PredictionNoisy.Mean(new long[] { 2, 3 }, true))
                     using (TorchTensor PredictionNoisyStd = PredictionNoisy.Std(new long[] { 2, 3 }, true, true))
                     using (TorchTensor PredictionNoisyNormalized = (PredictionNoisy - PredictionNoisyMean) / (PredictionNoisyStd + 1e-4))
-                    using (TorchTensor PredictionMasked = PredictionNoisyNormalized.Mul(TensorMask[i]))
+                    //using (TorchTensor PredictionMasked = PredictionNoisyNormalized.Mul(TensorMask[i]))
+                    using (TorchTensor PredictionMasked = PredictionNoisyNormalized)
                     using (TorchTensor IsFakeReal = Discriminators[i].Forward(PredictionMasked))
                     using (TorchTensor PredictionDetached = PredictionNoisy.Detach())
                     using (TorchTensor LossFake = IsFakeReal.Mean())
