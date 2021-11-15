@@ -30,17 +30,30 @@ namespace GANRecon
             int2 boxsize = new(boxLength);
             int[] devices = { 0 };
             GPU.SetDevice(devices[0]);
-            int batchSize = 4;
+
+            int seed = 42;
             int numEpochs = 1000;
             int discIters = 8;
             int PreProcessingDevice = 0;
             int DimRaw = 128;
             int Dim_zoom = 96;
-            int Dim = 32;
+            int Dim = 64;
+            int thisBatchSize = 64;
             string WorkingDirectory = @"D:\GAN_recon_polcompl\";
+            string DirectoryReal = "particles";
             float3[] RandomParticleAngles = Helper.GetHealpixAngles(3).Select(s => s * Helper.ToRad).ToArray();
             {
 
+                Star TableIn = new Star(Path.Combine(WorkingDirectory, "cryosparc_P243_J525_003_particles.star"));
+
+
+                string[] ColumnStackNames = TableIn.GetColumn("rlnImageName").Select(s => Helper.PathToNameWithExtension(s.Substring(s.IndexOf('@') + 1))).ToArray();
+                HashSet<string> UniqueStackNames = Helper.GetUniqueElements(ColumnStackNames);
+                UniqueStackNames.RemoveWhere(s => !File.Exists(Path.Combine(WorkingDirectory, DirectoryReal, s)));
+                int[] KeepRows = Helper.ArrayOfSequence(0, TableIn.RowCount, 1).Where(r => UniqueStackNames.Contains(ColumnStackNames[r])).ToArray();
+                TableIn = TableIn.CreateSubset(KeepRows);
+                CTF[] AllParticleCTF = TableIn.GetRelionCTF();
+                int[] AllIDs = Helper.ArrayOfSequence(0, AllParticleCTF.Length, 1);
                 GPU.SetDevice(PreProcessingDevice);
                 Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "cryosparc_P243_J525_003_volume_map.mrc"));
 
@@ -51,7 +64,9 @@ namespace GANRecon
 
                 TrefVolume.MaskSpherically(Dim / 2 + 2 * Dim / 8, Dim / 8, true);
                 var tensorRefVolume = TensorExtensionMethods.ToTorchTensor(TrefVolume.GetHostContinuousCopy(), new long[] { 1, 1, Dim, Dim, Dim }).ToDevice(TorchSharp.DeviceType.CUDA, PreProcessingDevice);
-
+                Image CTFCoords = CTF.GetCTFCoords(Dim, DimRaw);
+                Image thisCTF = new Image(new int3(Dim, Dim, thisBatchSize), true);
+                Random rand = new(42);
                 using (TorchTensor projMask = Float32Tensor.Ones(new long[] { 1, Dim, Dim }, DeviceType.CUDA, PreProcessingDevice))
                 {
 
@@ -64,9 +79,9 @@ namespace GANRecon
                     Mask.Dispose();
 
                     ReconstructionWGANGenerator gen = Modules.ReconstructionWGANGenerator(tensorRefVolume, Dim);
-                    int thisBatchSize = 64;
-                    TorchTensor TensorS = Float32Tensor.Ones(new long[] { 1 }, DeviceType.CUDA, PreProcessingDevice, true);
 
+                    TorchTensor TensorS = Float32Tensor.Ones(new long[] { 1 }, DeviceType.CUDA, PreProcessingDevice, true);
+                    TorchTensor TensorCTF = Float32Tensor.Zeros(new long[] { thisBatchSize, 1, Dim, Dim / 2 + 1 });
                     using (TorchTensor MaskSum = projMask.Sum())
                     using (TorchTensor angles = Float32Tensor.Zeros(new long[] { thisBatchSize, 3 }, DeviceType.CUDA, PreProcessingDevice))
                     {
@@ -82,7 +97,7 @@ namespace GANRecon
                             using (TorchTensor maskedProjSum = maskedProj.Sum(new long[] { 2, 3 }, true))
                             using (TorchTensor maskedProjMean = maskedProjSum / MaskSum)
                             using (TorchTensor maskedProjStd = ((maskedProj - maskedProjMean).Pow(2) * maskedProj).Sum(new long[] { 2, 3 }) / MaskSum)
-                            using(TorchTensor mean = maskedProjStd.Mean())
+                            using (TorchTensor mean = maskedProjStd.Mean())
                             using (TorchTensor rec = mean.Pow(-1))
                             {
                                 //s = maskedProjStd.Mean().Detach().RequiresGrad(true);
@@ -100,7 +115,7 @@ namespace GANRecon
                                 GPU.CheckGPUExceptions();
                                 Console.WriteLine($"s: {bufferS[0]}");
                             }
-                         }
+                        }
                         int memorySize = 100;
                         int memoryPos = 0;
                         float[] lastSValues = new float[memorySize];
@@ -108,9 +123,9 @@ namespace GANRecon
                         Optimizer optim = Optimizer.Adam(new List<TorchTensor> { TensorS }, 0.01, 1e-6);
                         for (int i = 0; i < 10; i++)
                         {
-                            
+
                             float[] losses = new float[(int)(RandomParticleAngles.Length / thisBatchSize)];
- 
+
                             int batchIdx = 0;
                             for (int offset = 0; RandomParticleAngles.Length - offset > thisBatchSize; offset += thisBatchSize)
                             {
@@ -118,16 +133,36 @@ namespace GANRecon
                                 float3[] theseAngles = RandomParticleAngles.Skip(offset).Take(thisBatchSize).ToArray();
                                 float[] theseAnglesInterleaved = Helper.ToInterleaved(theseAngles);
                                 GPU.CopyHostToDevice(theseAnglesInterleaved, angles.DataPtr(), thisBatchSize * 3);
-                                
-
+                                var SubsetIDs = Helper.RandomSubset(AllIDs, thisBatchSize, rand.Next());
+                                GPU.CreateCTF(thisCTF.GetDevice(Intent.Write),
+                                    CTFCoords.GetDevice(Intent.Read),
+                                    IntPtr.Zero,
+                                    (uint)CTFCoords.ElementsSliceComplex,
+                                    Helper.IndexedSubset(AllParticleCTF, SubsetIDs).Select(c => c.ToStruct()).ToArray(),
+                                    false,
+                                    (uint)thisBatchSize);
+                                Image thisCTFSign = thisCTF.GetCopy();
+                                thisCTFSign.Sign();
+                                thisCTF.Multiply(thisCTFSign);
+                                thisCTFSign.Dispose();
+                                GPU.CopyDeviceToDevice(thisCTF.GetDevice(Intent.Read),
+                                    TensorCTF.DataPtr(),
+                                    thisBatchSize * thisCTF.Dims.ElementsFFT());
                                 /*calculate stdDev of proj within circular mask projMask, then penalize deviation from 1*/
                                 using (TorchTensor proj = gen.Forward_Normalized(angles, TensorS))
-                                using (TorchTensor maskedProj = proj * projMask)
+                                using (TorchTensor projFT = proj.rfftn(new long[] { 2, 3 }))
+                                using (TorchTensor projFTConv = projFT.Mul(TensorCTF))
+                                using (TorchTensor projConv = projFTConv.irfftn(new long[] { 2, 3 }))
+                                using (TorchTensor maskedProj = projConv * projMask)
                                 using (TorchTensor maskedProjSum = maskedProj.Sum(new long[] { 2, 3 }, true))
                                 using (TorchTensor maskedProjMean = maskedProjSum / MaskSum)
                                 using (TorchTensor maskedProjStd = ((maskedProj - maskedProjMean).Pow(2) * maskedProj).Sum(new long[] { 2, 3 }) / MaskSum)
                                 using (TorchTensor TensorLoss = (maskedProjStd - 1).Pow(2).Mean())
                                 {
+
+                                    { 
+                                        Image maskeProjIm = new Image(new int3(Dim, Dim, thisBatchSize))
+                                    }
 
                                     TensorLoss.Backward();
                                     optim.Step();
@@ -135,13 +170,13 @@ namespace GANRecon
                                     float[] buffer = new float[1];
                                     GPU.CopyDeviceToHost(TensorLoss.DataPtr(), buffer, 1);
                                     float loss = buffer[0];
- 
+
                                     GPU.CopyDeviceToHost(TensorS.DataPtr(), buffer, 1);
                                     float s = buffer[0];
 
                                     losses[batchIdx] = loss;
                                     lastSValues[memoryPos] = s;
-                                    if(memoryPos == memorySize - 1)
+                                    if (memoryPos == memorySize - 1)
                                     {
                                         full = true;
                                         memoryPos = 0;
@@ -151,7 +186,7 @@ namespace GANRecon
                                         memoryPos++;
                                     }
                                     Console.WriteLine($"Loss: {loss}\ts: {s}");
-                                    if (full && (Math.Abs(((MathHelper.Mean(lastSValues) - s) / s)) < 1e-2))
+                                    if (full && (Math.Abs(((MathHelper.Mean(lastSValues) - s) / s)) < 1e-3))
                                     {
                                         Console.WriteLine($"Final S: {s}");
                                         return;
