@@ -27,11 +27,21 @@ namespace TorchSharp.NN
         }
 
         [DllImport("LibTorchSharp")]
-        private static extern IntPtr THSNN_ReconstructionWGANGenerator_forward(Module.HType module, IntPtr angles, double sigmashift);
+        private static extern IntPtr THSNN_ReconstructionWGANGenerator_project(Module.HType module, IntPtr angles, double sigmashift);
 
-        public TorchTensor Forward(TorchTensor angles, double sigmashift)
+        public TorchTensor Project(TorchTensor angles, double sigmashift)
         {
-            var res = THSNN_ReconstructionWGANGenerator_forward(handle, angles.Handle, sigmashift);
+            var res = THSNN_ReconstructionWGANGenerator_project(handle, angles.Handle, sigmashift);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
+
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSNN_ReconstructionWGANGenerator_forward(Module.HType module, IntPtr angles, bool do_shift);
+
+        public TorchTensor Forward(TorchTensor angles, bool do_shift)
+        {
+            var res = THSNN_ReconstructionWGANGenerator_forward(handle, angles.Handle, do_shift);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }
@@ -83,6 +93,7 @@ namespace TorchSharp.NN
             //norm.Dispose();
             return new TorchTensor(res);
         }
+
 
         public TorchTensor NormalizeProjection(TorchTensor t)
         {

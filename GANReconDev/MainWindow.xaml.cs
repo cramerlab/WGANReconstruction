@@ -55,18 +55,18 @@ namespace ParticleWGANDev
         private string DirectoryReal = "particles";
         private string DirectoryFake = "sim";
 
-        private int Dim = 48;
-        private int Dim_zoom = 128;
+        const int Dim = 48;
+        const int Dim_zoom = 96;
         
-        private double sigmaShiftPix = 0.5;
-        private double sigmaShiftRel = 0.5d/( 32 / 2);
+        const double sigmaShiftPix = 1.0;
+        const double sigmaShiftRel = sigmaShiftPix / (Dim / 2);
         /*
         private double sigmaShiftPix = 0.0d;
         private double sigmaShiftRel = 0.0d;
         */
         private double LowPass = 1.0;
 
-        private int BatchSize = 32;
+        private int BatchSize = 64;
         float Lambda = 0.001f;
         int DiscIters = 8;
         bool TrainGen = true;
@@ -204,6 +204,7 @@ namespace ParticleWGANDev
 
                     Random ReloadRand = new Random((int)par);
                     Random NoiseRand = new Random((int)par);
+                    Random ShiftRand = new Random((int)par);
                     bool OwnBatchUsed = true;
 
                     Image LoadStack = new Image(new int3(DimRaw, DimRaw, BatchSize));
@@ -274,6 +275,27 @@ namespace ParticleWGANDev
                                     //TImagesReal[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_TImagesReal[{iterTrain}]_afterProj.mrc", true);
                                 }*/
                                 Image projected = TProj.ProjectToRealspace(new int2(Dim), theseAngles);
+                                float3[] shiftsPix = Helper.ArrayOfFunction(i =>
+                                {
+                                    float x, y;
+                                    {
+                                        double u1 = 1.0 - NoiseRand.NextDouble(); //uniform(0,1] random doubles
+                                        double u2 = 1.0 - NoiseRand.NextDouble();
+                                        double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) *
+                                                     Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
+                                        x = (float)(0 + sigmaShiftPix * randStdNormal);
+                                    }
+                                    {
+                                        double u1 = 1.0 - NoiseRand.NextDouble(); //uniform(0,1] random doubles
+                                        double u2 = 1.0 - NoiseRand.NextDouble();
+                                        double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) *
+                                                     Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
+                                        y = (float)(0 + sigmaShiftPix * randStdNormal);
+                                    }
+                                    return new float3(x, y, 0);
+                                }, projected.Dims.Z);
+                                projected.ShiftSlices(shiftsPix);
+                                float3[] shiftsRel = Helper.ArrayOfFunction(i => shiftsPix[i] * 1.0f / (Dim / 2), shiftsPix.Length);
                                 GPU.CopyDeviceToDevice(projected.GetDevice(Intent.Read), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
                                 projected.Dispose();
                                 GPU.CheckGPUExceptions();
@@ -312,7 +334,7 @@ namespace ParticleWGANDev
                                 fft.Dispose();
                                 thisCTFSign.Dispose();*/
                                 //TImagesReal[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_TImagesReal[{iterTrain}]_1beforeNoise.mrc", true);
-                                TImagesReal[iterTrain].TransformValues(val =>
+                                /*TImagesReal[iterTrain].TransformValues(val =>
                                 {
                                     //https://stackoverflow.com/a/218600/5012099
                                     double u1 = 1.0 - NoiseRand.NextDouble(); //uniform(0,1] random doubles
@@ -321,7 +343,7 @@ namespace ParticleWGANDev
                                                  Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
                                     double randNormal = 0 + 1 * randStdNormal;
                                     return (float)(val + randNormal);
-                                });
+                                });*/
 
                                 //TImagesCTF[iterTrain].Multiply(TImagesCTF[iterTrain]);
                                 //TImagesReal[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_TImagesReal[{iterTrain}]_withNoise.mrc", true);

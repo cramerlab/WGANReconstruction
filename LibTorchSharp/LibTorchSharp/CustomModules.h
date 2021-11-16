@@ -25,7 +25,8 @@ EXPORT_API(void)     THSNN_ParticleWGANDiscriminator_clipweights(const NNModule 
 EXPORT_API(Tensor)   THSNN_ParticleWGANDiscriminator_penalizegradient(const NNModule module, const Tensor real, const Tensor fake, const float lambda);
 
 EXPORT_API(NNModule) THSNN_ReconstructionWGANGenerator_ctor(Tensor volume, int64_t boxsize, NNAnyModule* outAsAnyModule);
-EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_forward(const NNModule module, const Tensor angles, const double sigmashift);
+EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_forward(const NNModule module, const Tensor angles, const bool do_shift);
+EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_project(const NNModule module, const Tensor angles, const double sigmashift);
 EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_forward_normalized(const NNModule module, const Tensor angles, const Tensor factor);
 EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_apply_noise(const NNModule module, const Tensor fakeimages, const Tensor ctf);
 EXPORT_API(double)     THSNN_ReconstructionWGANGenerator_clip_gradient(const NNModule module, const double clip_Value);
