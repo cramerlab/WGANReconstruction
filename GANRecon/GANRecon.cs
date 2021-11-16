@@ -92,7 +92,7 @@ namespace GANRecon
 
 
                             /*calculate stdDev of proj within circular mask projMask, then penalize deviation from 1*/
-                            using (TorchTensor proj = gen.Forward(angles, 0.0d))
+                            using (TorchTensor proj = gen.Project(angles, 0.0d))
                             using (TorchTensor maskedProj = proj * projMask)
                             using (TorchTensor maskedProjSum = maskedProj.Sum(new long[] { 2, 3 }, true))
                             using (TorchTensor maskedProjMean = maskedProjSum / MaskSum)
@@ -160,8 +160,8 @@ namespace GANRecon
                                 using (TorchTensor TensorLoss = (maskedProjStd - 1).Pow(2).Mean())
                                 {
 
-                                    { 
-                                        Image maskeProjIm = new Image(new int3(Dim, Dim, thisBatchSize))
+                                    {
+                                        Image maskeProjIm = new Image(new int3(Dim, Dim, thisBatchSize));
                                     }
 
                                     TensorLoss.Backward();

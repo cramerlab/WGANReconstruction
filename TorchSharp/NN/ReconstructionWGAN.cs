@@ -27,11 +27,21 @@ namespace TorchSharp.NN
         }
 
         [DllImport("LibTorchSharp")]
-        private static extern IntPtr THSNN_ReconstructionWGANGenerator_forward(Module.HType module, IntPtr angles, double sigmashift);
+        private static extern IntPtr THSNN_ReconstructionWGANGenerator_project(Module.HType module, IntPtr angles, double sigmashift);
 
-        public TorchTensor Forward(TorchTensor angles, double sigmashift)
+        public TorchTensor Project(TorchTensor angles, double sigmashift)
         {
-            var res = THSNN_ReconstructionWGANGenerator_forward(handle, angles.Handle, sigmashift);
+            var res = THSNN_ReconstructionWGANGenerator_project(handle, angles.Handle, sigmashift);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
+
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSNN_ReconstructionWGANGenerator_forward(Module.HType module, IntPtr angles, bool do_shift);
+
+        public TorchTensor Forward(TorchTensor angles, bool do_shift)
+        {
+            var res = THSNN_ReconstructionWGANGenerator_forward(handle, angles.Handle, do_shift);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }
@@ -84,6 +94,7 @@ namespace TorchSharp.NN
             return new TorchTensor(res);
         }
 
+
         public TorchTensor NormalizeProjection(TorchTensor t)
         {
             TorchTensor ret;
@@ -116,11 +127,11 @@ namespace TorchSharp.NN
     public static partial class Modules
     {
         [DllImport("LibTorchSharp")]
-        private static extern IntPtr THSNN_ReconstructionWGANDiscriminator_ctor(out IntPtr pBoxedModule);
+        private static extern IntPtr THSNN_ReconstructionWGANDiscriminator_ctor(out IntPtr pBoxedModule, long boxsize);
 
-        static public ReconstructionWGANDiscriminator ReconstructionWGANDiscriminator()
+        static public ReconstructionWGANDiscriminator ReconstructionWGANDiscriminator(long boxsize)
         {
-            var res = THSNN_ReconstructionWGANDiscriminator_ctor(out var boxedHandle);
+            var res = THSNN_ReconstructionWGANDiscriminator_ctor(out var boxedHandle, boxsize);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new ReconstructionWGANDiscriminator(res, boxedHandle);
         }

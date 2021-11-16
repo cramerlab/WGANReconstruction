@@ -52,6 +52,7 @@ namespace Warp.NNModels
         private double sigmaShift = 0;
 
         private bool IsDisposed = false;
+        private bool doShift = true;
 
         private double GenVolumeBoost = 1;
         private double GenBoost = 1;
@@ -94,7 +95,7 @@ namespace Warp.NNModels
                 int DeviceID = Devices[i];
 
 
-                Discriminators[i] = ReconstructionWGANDiscriminator();
+                Discriminators[i] = ReconstructionWGANDiscriminator(boxDimensions.X);
                 Discriminators[i].ToCuda(DeviceID);
 
                 TensorTrueImages[i] = Float32Tensor.Zeros(new long[] { DeviceBatch, 1, BoxDimensions.Y, BoxDimensions.X }, DeviceType.CUDA, DeviceID);
@@ -229,7 +230,7 @@ namespace Warp.NNModels
 
                 GPU.CopyHostToDevice(angles, TensorAngles[i].DataPtr(), DeviceBatch * 3);
 
-                using (TorchTensor Prediction = Generators[i].Forward(TensorAngles[i], SigmaShift))
+                using (TorchTensor Prediction = Generators[i].Forward(TensorAngles[i], doShift))
                 using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
                 using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
                 using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
@@ -329,7 +330,7 @@ namespace Warp.NNModels
                     }
 
                     GPU.CopyHostToDevice(angles, TensorAngles[i].DataPtr(), DeviceBatch * 3);
-                    using (TorchTensor Prediction = Generators[i].Forward(TensorAngles[i], SigmaShift))
+                    using (TorchTensor Prediction = Generators[i].Forward(TensorAngles[i], doShift))
                     using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
                     using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
                     using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
