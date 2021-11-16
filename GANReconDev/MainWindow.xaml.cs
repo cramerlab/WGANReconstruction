@@ -55,7 +55,7 @@ namespace ParticleWGANDev
         private string DirectoryReal = "particles";
         private string DirectoryFake = "sim";
 
-        private int Dim = 128;
+        private int Dim = 48;
         private int Dim_zoom = 128;
         
         private double sigmaShiftPix = 0.5;
@@ -156,12 +156,16 @@ namespace ParticleWGANDev
                 {
                 //int par = 1;
                     GPU.SetDevice(PreProcessingDevice);
-                    Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "cryosparc_P682_J50_003_reconstruction.mrc"));
+                    Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "Refine3D_CryoSparcSelected_run_class001.mrc"));
                     if (Dim_zoom != DimRaw)
                         TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - Dim_zoom) / 2), new int3(Dim_zoom));
                     //TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_region.mrc");
                     if (Dim != Dim_zoom)
+                    {
                         TrefVolume = TrefVolume.AsScaled(new int3(Dim));
+                        float multiplicator = (float)(1 / Math.Sqrt(Math.Pow(((double)Dim) / ((double)Dim_zoom), 3.0d)));
+                        TrefVolume.Multiply(multiplicator);
+                    }
                     //TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_scaled.mrc");
                     //TrefVolume.MaskSpherically(Dim / 2 + 2 * Dim / 8, Dim / 8, true);
                     //TrefVolume.WriteMRC($@"{WorkingDirectory}/refVolume_masked.mrc");

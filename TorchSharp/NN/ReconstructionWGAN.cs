@@ -116,11 +116,11 @@ namespace TorchSharp.NN
     public static partial class Modules
     {
         [DllImport("LibTorchSharp")]
-        private static extern IntPtr THSNN_ReconstructionWGANDiscriminator_ctor(out IntPtr pBoxedModule);
+        private static extern IntPtr THSNN_ReconstructionWGANDiscriminator_ctor(out IntPtr pBoxedModule, long boxsize);
 
-        static public ReconstructionWGANDiscriminator ReconstructionWGANDiscriminator()
+        static public ReconstructionWGANDiscriminator ReconstructionWGANDiscriminator(long boxsize)
         {
-            var res = THSNN_ReconstructionWGANDiscriminator_ctor(out var boxedHandle);
+            var res = THSNN_ReconstructionWGANDiscriminator_ctor(out var boxedHandle, boxsize);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new ReconstructionWGANDiscriminator(res, boxedHandle);
         }

@@ -94,7 +94,7 @@ namespace Warp.NNModels
                 int DeviceID = Devices[i];
 
 
-                Discriminators[i] = ReconstructionWGANDiscriminator();
+                Discriminators[i] = ReconstructionWGANDiscriminator(boxDimensions.X);
                 Discriminators[i].ToCuda(DeviceID);
 
                 TensorTrueImages[i] = Float32Tensor.Zeros(new long[] { DeviceBatch, 1, BoxDimensions.Y, BoxDimensions.X }, DeviceType.CUDA, DeviceID);

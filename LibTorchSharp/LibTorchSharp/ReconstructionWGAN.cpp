@@ -292,7 +292,7 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
     torch::nn::Sequential Discriminator;
 
 
-    ReconstructionWGANDiscriminatorImpl()
+    ReconstructionWGANDiscriminatorImpl(int64_t boxsize)
     {
         const bool sn = false;
 
@@ -321,15 +321,24 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
 
 
                 Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(768, 1536, 3).stride(1).padding(1)));
-                Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
+                if (boxsize >= 32) 
+                    Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
                 
                 Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(1536, 3072, 3).stride(1).padding(1)));
-                Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
+                if (boxsize >= 64)
+                    Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
 
                 Discriminator->push_back(torch::nn::Flatten(torch::nn::FlattenOptions()));
-                Discriminator->push_back(SpNormLinear(torch::nn::LinearOptions(1536*9, 10)));
+                int size = 0;
+                {
+                    torch::NoGradGuard no_grad;
+                    auto output = Discriminator->forward(torch::ones({ 1,1,boxsize ,boxsize }));
+                    auto dims = output.sizes().vec();
+                    size = dims[1];
+                }
+                Discriminator->push_back(SpNormLinear(torch::nn::LinearOptions(size, 10)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
                 Discriminator->push_back(SpNormLinear(torch::nn::LinearOptions(10, 1)));
             }
@@ -354,15 +363,24 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
 
 
                 Discriminator->push_back(torch::nn::Conv2d(torch::nn::Conv2dOptions(768, 1536, 3).stride(1).padding(1)));
-                Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
+                if(boxsize>=32)
+                    Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
 
                 Discriminator->push_back(torch::nn::Conv2d(torch::nn::Conv2dOptions(1536, 3072, 3).stride(1).padding(1)));
-                Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
+                if(boxsize>=64)
+                    Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
                 
                 Discriminator->push_back(torch::nn::Flatten(torch::nn::FlattenOptions()));
-                Discriminator->push_back(torch::nn::Linear(torch::nn::LinearOptions(3072*4, 10)));
+                int size = 0;
+                {
+                    torch::NoGradGuard no_grad;
+                    auto output = Discriminator->forward(torch::ones({ 1,1,boxsize ,boxsize }));
+                    auto dims = output.sizes().vec();
+                    size = dims[1];
+                }
+                Discriminator->push_back(torch::nn::Linear(torch::nn::LinearOptions(size, 10)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
                 Discriminator->push_back(torch::nn::Linear(torch::nn::LinearOptions(10, 1)));
                 
@@ -446,11 +464,11 @@ Tensor THSNN_ReconstructionWGANGenerator_apply_noise(const NNModule module, cons
 }
 
 
-NNModule THSNN_ReconstructionWGANDiscriminator_ctor(NNAnyModule* outAsAnyModule)
+NNModule THSNN_ReconstructionWGANDiscriminator_ctor(NNAnyModule* outAsAnyModule, int64_t boxsize)
 {
     //CATCH_RETURN_NNModule
     //(
-    ReconstructionWGANDiscriminatorImpl Net;
+    ReconstructionWGANDiscriminatorImpl Net(boxsize);
     auto mod = std::make_shared<ReconstructionWGANDiscriminatorImpl>(Net);
 
     // Keep a boxed version of the module in case we add it to a Sequential later (the C++ templating means
