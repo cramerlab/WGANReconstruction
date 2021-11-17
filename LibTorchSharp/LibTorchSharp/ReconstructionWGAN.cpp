@@ -296,8 +296,8 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
 
         fakeimages = fakeimages.add(at::roll(allnoise, { (long long)((std::rand() / RAND_MAX)-0.5)* fakeimages.size(2), (long long)((std::rand() / RAND_MAX) - 0.5) * fakeimages.size(3) }, {2,3}));
         */
-        //torch::Tensor noise = torch::randn(fakeimages.sizes(), fakeimages.options());
-        //fakeimages = fakeimages.add(noise);
+        torch::Tensor noise = torch::randn(fakeimages.sizes(), fakeimages.options());
+        fakeimages = fakeimages.add(noise);
         return fakeimages;
     }
 

@@ -66,7 +66,7 @@ namespace ParticleWGANDev
         */
         private double LowPass = 1.0;
 
-        private int BatchSize = 64;
+        private int BatchSize = 128;
         float Lambda = 0.001f;
         int DiscIters = 8;
         bool TrainGen = true;
@@ -93,7 +93,7 @@ namespace ParticleWGANDev
                 Torch.SetSeed(seed);
                 //ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 32, new[] { 1 }, BatchSize);
                 //Image refVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
-                ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), new[] { ProcessingDevice }, BatchSize);
+                ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), new[] { 0,2 }, BatchSize);
                 TrainModel.SigmaShift = sigmaShiftRel;
                 //TrainModel.Load(@"D:\GAN_recon_polcompl\ParticleWGAN_SN_20210910_161349.pt");
                 WriteToLog("Done. (" + GPU.GetFreeMemory(ProcessingDevice) + " MB free)");
@@ -334,7 +334,7 @@ namespace ParticleWGANDev
                                 fft.Dispose();
                                 thisCTFSign.Dispose();*/
                                 //TImagesReal[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_TImagesReal[{iterTrain}]_1beforeNoise.mrc", true);
-                                /*TImagesReal[iterTrain].TransformValues(val =>
+                                TImagesReal[iterTrain].TransformValues(val =>
                                 {
                                     //https://stackoverflow.com/a/218600/5012099
                                     double u1 = 1.0 - NoiseRand.NextDouble(); //uniform(0,1] random doubles
@@ -343,7 +343,7 @@ namespace ParticleWGANDev
                                                  Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
                                     double randNormal = 0 + 0.5 * randStdNormal;
                                     return (float)(val + randNormal);
-                                });*/
+                                });
 
                                 //TImagesCTF[iterTrain].Multiply(TImagesCTF[iterTrain]);
                                 //TImagesReal[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_TImagesReal[{iterTrain}]_withNoise.mrc", true);
