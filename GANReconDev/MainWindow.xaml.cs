@@ -212,7 +212,7 @@ namespace ParticleWGANDev
                     Image[] TImagesReal = Helper.ArrayOfFunction(i => new Image(new int3(Dim, Dim, BatchSize)), DiscIters + 1);
                     Image[] TImagesCTF = Helper.ArrayOfFunction(i => new Image(new int3(Dim, Dim, BatchSize), true), DiscIters + 1);
                     float[][] TImagesAngles = Helper.ArrayOfFunction(i => new float[BatchSize*3], DiscIters + 1);
-                    Image CTFCoords = CTF.GetCTFCoords(Dim, DimRaw);
+                    Image CTFCoords = CTF.GetCTFCoords(Dim, Dim_zoom);
 
                     int PlanForw = 0, PlanBack = 0;
                     if (DimRaw != Dim)
@@ -294,7 +294,9 @@ namespace ParticleWGANDev
                                     }
                                     return new float3(x, y, 0);
                                 }, projected.Dims.Z);
+                                //projected.WriteMRC(@$"{WorkingDirectory}\Thread_{par}_projected.mrc", true);
                                 projected.ShiftSlices(shiftsPix);
+                                //projected.WriteMRC(@$"{WorkingDirectory}\Thread_{par}_projectedShifted.mrc", true);
                                 float3[] shiftsRel = Helper.ArrayOfFunction(i => shiftsPix[i] * 1.0f / (Dim / 2), shiftsPix.Length);
                                 GPU.CopyDeviceToDevice(projected.GetDevice(Intent.Read), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
                                 projected.Dispose();
@@ -309,6 +311,7 @@ namespace ParticleWGANDev
                                               Helper.IndexedSubset(AllParticleCTF, SubsetIDs).Select(c => c.ToStruct()).ToArray(),
                                               false,
                                               (uint)BatchSize);
+                                //TImagesCTF[iterTrain].WriteMRC(@$"{WorkingDirectory}\Thread_{par}_CTF.mrc", true);
                                 Image thisCTFSign = TImagesCTF[iterTrain].GetCopy();
                                 thisCTFSign.Sign();
                                 TImagesCTF[iterTrain].Multiply(thisCTFSign);
@@ -319,7 +322,7 @@ namespace ParticleWGANDev
                                 TImagesReal[iterTrain] = fft.AsIFFT(false, 0, true);
                                 fft.Dispose();
                                 thisCTFSign.Dispose();
-
+                                //TImagesReal[iterTrain].WriteMRC(@$"{WorkingDirectory}\Thread_{par}_conv.mrc", true);
 
                                 //TImagesCTF[iterTrain].Fill(1.0f);
                                 /*
