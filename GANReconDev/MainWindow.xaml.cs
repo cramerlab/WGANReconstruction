@@ -570,7 +570,7 @@ namespace ParticleWGANDev
                                 resized = imageVolume;
 
                             if (Dim_zoom != DimRaw)
-                                resized = resized.AsPadded(new int3(Dim_zoom));
+                                resized = resized.AsPadded(new int3(DimRaw));
                             resized.WriteMRC(WorkingDirectory + @"ParticleWGAN_SN_" + datestring + "_resized.mrc", true);
 
                             resized.MaskSpherically(Dim / 2, Dim / 8, false);
