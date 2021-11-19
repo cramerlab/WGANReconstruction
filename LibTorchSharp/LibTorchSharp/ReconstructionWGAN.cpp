@@ -217,7 +217,7 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
     {
 
         torch::Tensor trans_matrices = matrix_from_angles(angles);
-        torch::Tensor shifts;
+        torch::Tensor shifts = torch::zeros({ angles.size(0), 3, 1 }, angles.options());;
         if (do_shift) {
             shifts = torch::randn({ angles.size(0), 3, 1 }, angles.options()) * _sigmashift;
             shifts = shifts.minimum(torch::ones_like(shifts) * _sigmashift * 3);

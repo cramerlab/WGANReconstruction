@@ -55,8 +55,8 @@ namespace ParticleWGANDev
         private string DirectoryReal = "particles";
         private string DirectoryFake = "sim";
 
-        const int Dim = 48;
-        const int Dim_zoom = 96;
+        const int Dim = 128;
+        const int Dim_zoom = 128;
         
         const double sigmaShiftPix = 1.0;
         const double sigmaShiftRel = sigmaShiftPix / (Dim / 2);
@@ -66,9 +66,9 @@ namespace ParticleWGANDev
         */
         private double LowPass = 1.0;
 
-        private int BatchSize = 128;
+        private int BatchSize = 32;
         float Lambda = 0.001f;
-        int DiscIters = 8;
+        int DiscIters = 4;
         bool TrainGen = true;
 
         int NThreads = 3;
@@ -295,7 +295,7 @@ namespace ParticleWGANDev
                                     return new float3(x, y, 0);
                                 }, projected.Dims.Z);
                                 //projected.WriteMRC(@$"{WorkingDirectory}\Thread_{par}_projected.mrc", true);
-                                projected.ShiftSlices(shiftsPix);
+                                //projected.ShiftSlices(shiftsPix);
                                 //projected.WriteMRC(@$"{WorkingDirectory}\Thread_{par}_projectedShifted.mrc", true);
                                 float3[] shiftsRel = Helper.ArrayOfFunction(i => shiftsPix[i] * 1.0f / (Dim / 2), shiftsPix.Length);
                                 GPU.CopyDeviceToDevice(projected.GetDevice(Intent.Read), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
