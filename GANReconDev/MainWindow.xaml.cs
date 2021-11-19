@@ -57,8 +57,8 @@ namespace ParticleWGANDev
 
         const int Dim = 64;
         const int Dim_zoom = 128;
-        
-        const double sigmaShiftPix = 1.0;
+        const decimal reduction = 0.8M;
+        const double sigmaShiftPix = 0.5;
         const double sigmaShiftRel = sigmaShiftPix / (Dim / 2);
         /*
         private double sigmaShiftPix = 0.0d;
@@ -295,7 +295,7 @@ namespace ParticleWGANDev
                                     return new float3(x, y, 0);
                                 }, projected.Dims.Z);
                                 //projected.WriteMRC(@$"{WorkingDirectory}\Thread_{par}_projected.mrc", true);
-                                //projected.ShiftSlices(shiftsPix);
+                                projected.ShiftSlices(shiftsPix);
                                 //projected.WriteMRC(@$"{WorkingDirectory}\Thread_{par}_projectedShifted.mrc", true);
                                 float3[] shiftsRel = Helper.ArrayOfFunction(i => shiftsPix[i] * 1.0f / (Dim / 2), shiftsPix.Length);
                                 GPU.CopyDeviceToDevice(projected.GetDevice(Intent.Read), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
@@ -504,7 +504,7 @@ namespace ParticleWGANDev
                     {
                         WriteToLog($"{MathHelper.Mean(AllLossesReal):#.##E+00}, {MathHelper.Mean(AllLossesFake):#.##E+00}, {MathHelper.Max(AllGradNormDisc):#.##E+00}, {MathHelper.Max(AllGradNormGen):#.##E+00}");
 
-                        LossPointsReal.Add(new ObservablePoint(IterationsDone, MathHelper.Mean(AllLossesReal)));
+                        LossPointsReal.Add(new ObservablePoint(IterationsDone, -1*MathHelper.Mean(AllLossesReal)));
                         Dispatcher.Invoke(() => SeriesLossReal.Values = new ChartValues<ObservablePoint>(LossPointsReal));
 
                         LossPointsFake.Add(new ObservablePoint(IterationsDone, MathHelper.Mean(AllLossesFake)));
@@ -606,7 +606,7 @@ namespace ParticleWGANDev
                     if ((IterationsDone * BatchSize * (DiscIters + 1)) > (currentEpoch + 1) * numParticles) 
                     { 
                         currentEpoch += 1;
-                        Dispatcher.Invoke(() => LearningRate = LearningRate * 0.9M);
+                        Dispatcher.Invoke(() => LearningRate = LearningRate * reduction);
                     }
 
                     ReloadBlock.Release();
