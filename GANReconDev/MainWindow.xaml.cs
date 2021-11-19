@@ -93,7 +93,7 @@ namespace ParticleWGANDev
                 Torch.SetSeed(seed);
                 //ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 32, new[] { 1 }, BatchSize);
                 //Image refVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
-                ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), new[] { 0,2 }, BatchSize);
+                ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), new[] { 0,1 }, BatchSize);
                 TrainModel.SigmaShift = sigmaShiftRel;
                 //TrainModel.Load(@"D:\GAN_recon_polcompl\ParticleWGAN_SN_20210910_161349.pt");
                 WriteToLog("Done. (" + GPU.GetFreeMemory(ProcessingDevice) + " MB free)");
