@@ -55,7 +55,7 @@ namespace ParticleWGANDev
         private string DirectoryReal = "particles";
         private string DirectoryFake = "sim";
 
-        const int Dim = 128;
+        const int Dim = 64;
         const int Dim_zoom = 128;
         
         const double sigmaShiftPix = 1.0;

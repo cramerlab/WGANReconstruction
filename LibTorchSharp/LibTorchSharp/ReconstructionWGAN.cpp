@@ -323,7 +323,7 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
                 
 
                 Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(1, 96, 3).stride(1).padding(1)));
-                Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
+                //Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
 
 
