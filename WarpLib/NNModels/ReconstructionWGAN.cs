@@ -54,7 +54,7 @@ namespace Warp.NNModels
         private bool IsDisposed = false;
         private bool doShift = true;
 
-        private double GenVolumeBoost = 1;
+        private double GenVolumeBoost = 10;
         private double GenBoost = 1;
         private double generator_grad_clip_val = 1e4f;
         private double discriminator_grad_clip_val = 1e8f;
