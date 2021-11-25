@@ -220,7 +220,7 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
         torch::Tensor shifts = torch::zeros({ angles.size(0), 3, 1 }, angles.options());;
         if (do_shift) {
             shifts = torch::randn({ angles.size(0), 3, 1 }, angles.options()) * _sigmashift;
-            shifts = shifts.minimum(torch::ones_like(shifts) * _sigmashift * 3);
+            //shifts = shifts.minimum(torch::ones_like(shifts) * _sigmashift * 3);
         }
         trans_matrices = torch::cat({ trans_matrices, shifts }, 2);
         trans_matrices = trans_matrices.to(_volume.device());
@@ -296,8 +296,8 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
 
         fakeimages = fakeimages.add(at::roll(allnoise, { (long long)((std::rand() / RAND_MAX)-0.5)* fakeimages.size(2), (long long)((std::rand() / RAND_MAX) - 0.5) * fakeimages.size(3) }, {2,3}));
         */
-        torch::Tensor noise = torch::randn(fakeimages.sizes(), fakeimages.options());
-        fakeimages = fakeimages.add(noise);
+        /*torch::Tensor noise = torch::randn(fakeimages.sizes(), fakeimages.options());
+        fakeimages = fakeimages.add(noise);*/
         return fakeimages;
     }
 

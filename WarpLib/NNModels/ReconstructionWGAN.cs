@@ -52,7 +52,7 @@ namespace Warp.NNModels
         private double sigmaShift = 0;
 
         private bool IsDisposed = false;
-        private bool doShift = true;
+        private bool doShift = false;
 
         private double GenVolumeBoost = 10;
         private double GenBoost = 1;
@@ -139,14 +139,17 @@ namespace Warp.NNModels
                 Generators[i].ToCuda(DeviceID);
             }, null);
 
-
+            
             OptimizerGenVolume = Optimizer.Adam(Generators[0].GetParameters().Take(1), 0.01, 1e-8);
             OptimizerGenVolume.SetBetasAdam(0.5, 0.9);
             OptimizerGen = Optimizer.Adam(Generators[0].GetParameters().Skip(1), 0.01, 1e-8);
             OptimizerGen.SetBetasAdam(0.5, 0.9);
             OptimizerDisc = Optimizer.Adam(Discriminators[0].GetParameters(), 0.01, 1e-8);
             OptimizerDisc.SetBetasAdam(0.5, 0.9);
-
+            
+            //OptimizerGenVolume = Optimizer.RMSprop(Generators[0].GetParameters().Take(1), 0.01, 1e-8);
+            //OptimizerGen = Optimizer.RMSprop(Generators[0].GetParameters().Skip(1), 0.01, 1e-8);
+            //OptimizerDisc = Optimizer.RMSprop(Discriminators[0].GetParameters(), 0.01, 1e-8);
             ResultPredicted = new Image(IntPtr.Zero, new int3(BoxDimensions.X, BoxDimensions.Y, BatchSize));
             ResultPredictedNoisy = new Image(IntPtr.Zero, new int3(BoxDimensions.X, BoxDimensions.Y, BatchSize));
         }
@@ -190,7 +193,16 @@ namespace Warp.NNModels
             return imageVolume;
         }
 
+        public float getSigma()
+        {
 
+            var tensorShift = Generators[0].GetParameters()[1];
+
+            float[] shiftSotre = new float[1];
+            GPU.CopyDeviceToHost(tensorShift.DataPtr(), shiftSotre, 1);
+
+            return shiftSotre[0];
+        }
 
         public void set_discriminator_grad_clip_val(double clip_val)
         {
@@ -212,6 +224,8 @@ namespace Warp.NNModels
         {
             OptimizerGen.SetLearningRateAdam(learningRate * GenBoost);
             OptimizerGenVolume.SetLearningRateAdam(learningRate * GenVolumeBoost);
+            //OptimizerGen.SetLearningRateRMSprop(learningRate);
+            //OptimizerGenVolume.SetLearningRateRMSprop(learningRate);
             OptimizerGen.ZeroGrad();
 
             SyncParams();
@@ -243,8 +257,9 @@ namespace Warp.NNModels
                 //using (TorchTensor PredictionNoisyMasked = PredictionNoisyNormalized.Mul(TensorMask[i]))
                 using (TorchTensor PredictionNoisyMasked = PredictionNoisyNormalized)
                 
-                using (TorchTensor IsItReal = Discriminators[i].Forward(PredictionNoisyMasked))
-                using (TorchTensor Loss = ((-1) * IsItReal).Mean())
+                //using (TorchTensor IsItReal = Discriminators[i].Forward(PredictionNoisyMasked))
+                //using (TorchTensor Loss = ((-1) * IsItReal).Mean())
+                using(TorchTensor Loss = (PredictionConv- TensorTrueImages[i]).Pow(2).Sum())
                 {
 
                     GPU.CopyDeviceToDevice(Prediction.DataPtr(),
@@ -268,12 +283,11 @@ namespace Warp.NNModels
                 {
                     penalty.Backward();
                 }*/
-                thisGradNorm = Generators[i].Clip_Gradients(generator_grad_clip_val);
             }, null);
 
-            gradNorm = thisGradNorm;
+            
             GatherGrads();
-
+            gradNorm = Generators[0].Clip_Gradients(generator_grad_clip_val);
             OptimizerGen.Step();
             OptimizerGenVolume.Step();
             prediction = ResultPredicted;
@@ -295,6 +309,7 @@ namespace Warp.NNModels
                                                out double gradNorm)
         {
             OptimizerDisc.SetLearningRateAdam(learningRate);
+            //OptimizerDisc.SetLearningRateRMSprop(learningRate);
             OptimizerDisc.ZeroGrad();
 
             SyncParams();
@@ -364,11 +379,10 @@ namespace Warp.NNModels
                         }
                     }
                 }
-                thisGradNorm = Discriminators[i].Clip_Gradients(discriminator_grad_clip_val);
             }, null);
-            gradNorm = thisGradNorm;
-            GatherGrads();
 
+            GatherGrads();
+            gradNorm = Discriminators[0].Clip_Gradients(discriminator_grad_clip_val);
             OptimizerDisc.Step();
 
             prediction = ResultPredicted;
