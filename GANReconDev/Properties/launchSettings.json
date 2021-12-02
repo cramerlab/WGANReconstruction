@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "ParticleWGANDev": {
+    "GANReconDev": {
       "commandName": "Project",
       "nativeDebugging": true
     }

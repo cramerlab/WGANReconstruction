@@ -55,6 +55,17 @@ namespace TorchSharp.NN
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }
+
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSNN_ReconstructionWGANGenerator_get_volume(Module.HType module);
+
+        public TorchTensor Get_Volume()
+        {
+            var res = THSNN_ReconstructionWGANGenerator_get_volume(handle);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
+
     }
     public static partial class Modules
     {

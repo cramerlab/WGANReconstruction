@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "TildeDataLoader": {
+    "TestCustomOperators": {
       "commandName": "Project",
       "nativeDebugging": true
     }

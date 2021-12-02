@@ -14,9 +14,9 @@ using static TorchSharp.ScalarExtensionMethods;
 using TorchSharp;
 using System.Diagnostics;
 
-namespace TildeDataLoader
+namespace TestCustomOperators
 {
-    class TildeDataLoader
+    class TestCustomOperators
     {
         static void Main2(string[] args)
         {
@@ -171,6 +171,219 @@ namespace TildeDataLoader
             }
         }
 
+        static void testFFTCropSpeed()
+        {
+            //Test FFT Crop speed
+            if (true)
+            {
+                TorchTensor fullVolume = Float32Tensor.Random(new long[] { 20, 100, 100, 100 }, DeviceType.CUDA);
+                TorchTensor fullFFT = fullVolume.rfftn(new long[] { 1, 2, 3 });
+                for (int j = 0; j < 10; j++)
+                {
+                    Stopwatch stopWatch = new Stopwatch();
+                    stopWatch.Start();
+                    for (int i = 0; i < 1000; i++)
+                    {
+                        TorchTensor detached = fullFFT.Detach();
+                        TorchTensor thisFullFFT = detached.RequiresGrad(true);
+                        TorchTensor newCroppedFFT = FFTCrop(thisFullFFT, 3, 50, 50, 50);
+                        TorchTensor abs = newCroppedFFT.Abs();
+                        TorchTensor mean = abs.Mean();
+                        //mean.Backward();
+                        newCroppedFFT.Dispose();
+                        mean.Dispose();
+                        abs.Dispose();
+                        thisFullFFT.Dispose();
+                        detached.Dispose();
+
+                    }
+                    stopWatch.Stop();
+                    // Get the elapsed time as a TimeSpan value.
+                    TimeSpan ts = stopWatch.Elapsed;
+
+                    // Format and display the TimeSpan value.
+                    string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
+                        ts.Hours, ts.Minutes, ts.Seconds,
+                        ts.Milliseconds / 10);
+                    Console.WriteLine("RunTime new method " + elapsedTime);
+                }
+                /* I deleted the method based on my own kernel. It was about 4 times slower
+                for (int j = 0; j < 10; j++)
+                {
+                    Stopwatch stopWatch = new Stopwatch();
+                    stopWatch.Start();
+
+                    for (int i = 0; i < 1000; i++)
+                    {
+
+                        TorchTensor detached = fullFFT.Detach();
+                        TorchTensor thisFullFFT = detached.RequiresGrad(true);
+                        TorchTensor newCroppedFFT = FFTCrop(thisFullFFT, 50, 50, 50);
+                        TorchTensor abs = newCroppedFFT.Abs();
+                        TorchTensor mean = abs.Mean();
+                        //mean.Backward();
+                        mean.Dispose();
+                        detached.Dispose();
+                        abs.Dispose();
+                        newCroppedFFT.Dispose();
+                        mean.Dispose();
+                        thisFullFFT.Dispose();
+                    }
+                    stopWatch.Stop();
+                    // Get the elapsed time as a TimeSpan value.
+                    TimeSpan ts = stopWatch.Elapsed;
+
+                    // Format and display the TimeSpan value.
+                    string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
+                        ts.Hours, ts.Minutes, ts.Seconds,
+                        ts.Milliseconds / 10);
+                    Console.WriteLine("RunTime old method " + elapsedTime);
+                }
+                */
+                {
+                    //TorchTensor croppedFFT = FFTCrop(fullFFT, 50, 50, 50);
+                    //TorchTensor newPaddedFFT = newFFTCrop(fullFFT, 3, 150, 150, 150);
+                    //TorchTensor newCroppedFFT = newFFTCrop(newPaddedFFT, 3, 50, 50, 50);
+
+                    //bool test = croppedFFT.AllClose(newCroppedFFT);
+                }
+            }
+        }
+        static void testFFTCrop()
+        {
+            //Test FFT Crop vs warp crop
+            {
+                Image sourceVolumeOrg = Image.FromFile(@"D:\EMD\9233\emd_9233_2.0.mrc");
+                int cropDim = 100;
+
+                //Warp based Fourier Cropping for reference
+                Image WarpCropped = sourceVolumeOrg.AsScaled(new int3(100));
+
+                // Create a cropped volume using Torch Operator
+                TorchTensor TensorFullVolume = Float32Tensor.Zeros(new long[] { 1, sourceVolumeOrg.Dims.Z, sourceVolumeOrg.Dims.Y, sourceVolumeOrg.Dims.X }, DeviceType.CUDA, 0);
+                GPU.CopyDeviceToDevice(sourceVolumeOrg.GetDevice(Intent.Read), TensorFullVolume.DataPtr(), sourceVolumeOrg.ElementsReal);
+                GPU.CheckGPUExceptions();
+                TorchTensor TensorFFTFullVolume = TensorFullVolume.rfftn(new long[] { 1, 2, 3 });
+                TorchTensor TensorFFTCroppedVolume = FFTCrop(TensorFFTFullVolume, 3, cropDim, cropDim, cropDim);
+                TorchTensor TensorCroppedVolume = TensorFFTCroppedVolume.irfftn(new long[] { 1, 2, 3 });
+
+                TorchTensor TensorWarpCropped = Float32Tensor.Zeros(new long[] { 1, cropDim, cropDim, cropDim }, DeviceType.CUDA, 0);
+                GPU.CopyDeviceToDevice(WarpCropped.GetDevice(Intent.Read), TensorWarpCropped.DataPtr(), WarpCropped.ElementsReal);
+
+                bool isClose = TensorCroppedVolume.AllClose(TensorWarpCropped, 1E-5, 1E-5);
+                Debug.Assert(isClose, "Warp and torch cropping are not the same");
+                {
+                    Image croppedImage = new(new int3(cropDim));
+                    GPU.CopyDeviceToDevice(TensorWarpCropped.DataPtr(), croppedImage.GetDevice(Intent.Write), croppedImage.ElementsReal);
+                    croppedImage.WriteMRC("WarpCropped.mrc", true);
+                }
+                {
+                    Image croppedImage = new(new int3(cropDim));
+                    GPU.CopyDeviceToDevice(TensorCroppedVolume.DataPtr(), croppedImage.GetDevice(Intent.Write), croppedImage.ElementsReal);
+                    croppedImage.WriteMRC("OwnCropped.mrc", true);
+                }
+            }
+        }
+
+        static int makeEven(int num)
+        {
+            return (num / 2) * 2;
+        }
+
+        static void testVolumeScaling()
+        {
+            //Test FFT Crop vs warp crop
+            {
+                Image sourceVolumeOrg = Image.FromFile(@"D:\EMD\9233\emd_9233_2.0.mrc");
+                sourceVolumeOrg.AsFFT(true).AsAmplitudes().WriteMRC("SourceVolumeFFT.mrc", true);
+                TorchTensor TensorFullVolume = Float32Tensor.Zeros(new long[] { 1, sourceVolumeOrg.Dims.Z, sourceVolumeOrg.Dims.Y, sourceVolumeOrg.Dims.X }, DeviceType.CUDA, 0);
+                GPU.CopyDeviceToDevice(sourceVolumeOrg.GetDevice(Intent.Read), TensorFullVolume.DataPtr(), sourceVolumeOrg.ElementsReal);
+                GPU.CheckGPUExceptions();
+                int cropDim = makeEven(sourceVolumeOrg.Dims.X/2);
+                int padDim = makeEven(sourceVolumeOrg.Dims.X*2);
+
+
+                //Cropping
+                {
+                    //Warp based Fourier Cropping for reference
+                    Image WarpCroppedVolume = sourceVolumeOrg.AsScaled(new int3(cropDim));
+                    TorchTensor TensorWarpCroppedVolume = Float32Tensor.Zeros(new long[] { 1, cropDim, cropDim, cropDim }, DeviceType.CUDA, 0);
+                    GPU.CopyDeviceToDevice(WarpCroppedVolume.GetDevice(Intent.Read), TensorWarpCroppedVolume.DataPtr(), WarpCroppedVolume.ElementsReal);
+
+                    // Create a cropped volume using Torch Operator
+                    TorchTensor TensorCroppedVolume = ScaleVolume(TensorFullVolume, 3, cropDim, cropDim, cropDim);
+
+                    //Write Out resulting volumes
+                    WarpCroppedVolume.WriteMRC("WarpCroppedVolume.mrc", true);
+                    Image OwnCroppedVolume = new(new int3(cropDim));
+                    GPU.CopyDeviceToDevice(TensorCroppedVolume.DataPtr(), OwnCroppedVolume.GetDevice(Intent.Write), OwnCroppedVolume.ElementsReal);
+                    OwnCroppedVolume.WriteMRC("OwnCroppedVolume.mrc", true);
+
+                    //Check for difference
+                    bool isClose = TensorCroppedVolume.AllClose(TensorWarpCroppedVolume, 1E-5, 1E-5);
+                    Debug.Assert(isClose, "Warp and torch cropping are not the same");
+                }
+
+                //Cropping Projections
+                {
+                    Projector proj = new Projector(sourceVolumeOrg, 2);
+                    Image projected = proj.ProjectToRealspace(new int2(sourceVolumeOrg.Dims.X), Helper.ArrayOfFunction(i => new float3((float)(i * 20.0 / 180.0 * Math.PI)), 18));
+
+                    Image WarpCroppedProjections = projected.AsScaled(new int2(cropDim));
+                    TorchTensor TensorProjected = Float32Tensor.Empty(new long[] {1, 18, sourceVolumeOrg.Dims.Y, sourceVolumeOrg.Dims.X }, DeviceType.CUDA, 0);
+                    GPU.CopyDeviceToDevice(projected.GetDevice(Intent.Read), TensorProjected.DataPtr(), projected.ElementsReal);
+
+                    TorchTensor TensorCroppedProjected = ScaleVolume(TensorProjected, 2, cropDim, cropDim, -1);
+
+                    //Write Out resulting volumes
+                    WarpCroppedProjections.WriteMRC("WarpCroppedProjections.mrc", true);
+                    Image OwnCroppedProjections = new(WarpCroppedProjections.Dims);
+                    GPU.CopyDeviceToDevice(TensorCroppedProjected.DataPtr(), OwnCroppedProjections.GetDevice(Intent.Write), OwnCroppedProjections.ElementsReal);
+                    OwnCroppedProjections.WriteMRC("OwnCroppedProjections.mrc", true);
+
+
+                }
+
+
+
+                //Padding
+                {
+                    //Warp based Fourier Cropping for reference
+                    Image WarpPaddedVolume = sourceVolumeOrg.AsScaled(new int3(padDim));
+                    TorchTensor TensorWarpPaddedVolume = Float32Tensor.Zeros(new long[] { 1, padDim, padDim, padDim }, DeviceType.CUDA, 0);
+                    GPU.CopyDeviceToDevice(WarpPaddedVolume.GetDevice(Intent.Read), TensorWarpPaddedVolume.DataPtr(), WarpPaddedVolume.ElementsReal);
+
+                    // Create a cropped volume using Torch Operator
+                    TorchTensor TensorPaddedVolume = ScaleVolume(TensorFullVolume, 3, padDim, padDim, padDim);
+
+                    //Write Out resulting volumes
+                    WarpPaddedVolume.WriteMRC("WarpPaddedVolume.mrc", true);
+                    Image WarpPaddedVolumeFFT = WarpPaddedVolume.AsFFT(true);
+                    WarpPaddedVolumeFFT = WarpPaddedVolumeFFT.AsAmplitudes();
+                    WarpPaddedVolumeFFT.WriteMRC("WarpPaddedVolumeFFT.mrc", true);
+                    Image OwnPaddedVolume = new(new int3(padDim));
+                    GPU.CopyDeviceToDevice(TensorPaddedVolume.DataPtr(), OwnPaddedVolume.GetDevice(Intent.Write), OwnPaddedVolume.ElementsReal);
+                    OwnPaddedVolume.WriteMRC("OwnPaddedVolume.mrc", true);
+                    Image OwnPaddedVolumeFFT = OwnPaddedVolume.AsFFT(true);
+                    OwnPaddedVolumeFFT = OwnPaddedVolumeFFT.AsAmplitudes();
+                    OwnPaddedVolumeFFT.WriteMRC("OwnPaddedVolumeFFT.mrc", true);
+                    OwnPaddedVolume.Subtract(WarpPaddedVolume);
+                    OwnPaddedVolume.Abs();
+                    OwnPaddedVolume.WriteMRC("DIFFReal.mrc", true);
+                    OwnPaddedVolumeFFT.Subtract(WarpPaddedVolumeFFT);
+                    OwnPaddedVolumeFFT.Abs();
+                    OwnPaddedVolumeFFT.WriteMRC("FFTReal.mrc", true);
+                    //Check for difference
+                    bool isClose = TensorPaddedVolume.AllClose(TensorWarpPaddedVolume, 1E-5, 1E-5);
+                    Debug.Assert(isClose, "Warp and torch cropping are not the same");
+
+
+                }
+
+            }
+        }
+
+
         static void Main3(string[] args)
         {
             GPU.SetDevice(0);
@@ -239,7 +452,7 @@ namespace TildeDataLoader
             }
         }
 
-        static void Main(string[] args)
+        static void TestAtomRastering()
         {
             GPU.SetDevice(0);
             int dim = 20;
@@ -590,114 +803,14 @@ namespace TildeDataLoader
 
             }
 
-            //Test FFT Crop speed
-            if(true)
-            {
-                TorchTensor fullVolume = Float32Tensor.Random(new long[] { 20, 100, 100, 100 }, DeviceType.CUDA);
-                TorchTensor fullFFT = fullVolume.rfftn(new long[] { 1, 2, 3 });
-                for (int j = 0; j < 10; j++)
-                {
-                    Stopwatch stopWatch = new Stopwatch();
-                    stopWatch.Start();
-                    for (int i = 0; i < 1000; i++)
-                    {
-                        TorchTensor detached = fullFFT.Detach();
-                        TorchTensor thisFullFFT = detached.RequiresGrad(true);
-                        TorchTensor newCroppedFFT = FFTCrop(thisFullFFT, 3,  50, 50, 50);
-                        TorchTensor abs = newCroppedFFT.Abs();
-                        TorchTensor mean = abs.Mean();
-                        //mean.Backward();
-                        newCroppedFFT.Dispose();
-                        mean.Dispose();
-                        abs.Dispose();
-                        thisFullFFT.Dispose();
-                        detached.Dispose();
 
-                    }
-                    stopWatch.Stop();
-                    // Get the elapsed time as a TimeSpan value.
-                    TimeSpan ts = stopWatch.Elapsed;
 
-                    // Format and display the TimeSpan value.
-                    string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
-                        ts.Hours, ts.Minutes, ts.Seconds,
-                        ts.Milliseconds / 10);
-                    Console.WriteLine("RunTime new method " + elapsedTime);
-                }
-                /* I deleted the method based on my own kernel. It was about 4 times slower
-                for (int j = 0; j < 10; j++)
-                {
-                    Stopwatch stopWatch = new Stopwatch();
-                    stopWatch.Start();
-
-                    for (int i = 0; i < 1000; i++)
-                    {
-
-                        TorchTensor detached = fullFFT.Detach();
-                        TorchTensor thisFullFFT = detached.RequiresGrad(true);
-                        TorchTensor newCroppedFFT = FFTCrop(thisFullFFT, 50, 50, 50);
-                        TorchTensor abs = newCroppedFFT.Abs();
-                        TorchTensor mean = abs.Mean();
-                        //mean.Backward();
-                        mean.Dispose();
-                        detached.Dispose();
-                        abs.Dispose();
-                        newCroppedFFT.Dispose();
-                        mean.Dispose();
-                        thisFullFFT.Dispose();
-                    }
-                    stopWatch.Stop();
-                    // Get the elapsed time as a TimeSpan value.
-                    TimeSpan ts = stopWatch.Elapsed;
-
-                    // Format and display the TimeSpan value.
-                    string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
-                        ts.Hours, ts.Minutes, ts.Seconds,
-                        ts.Milliseconds / 10);
-                    Console.WriteLine("RunTime old method " + elapsedTime);
-                }
-                */
-                {
-                    //TorchTensor croppedFFT = FFTCrop(fullFFT, 50, 50, 50);
-                    //TorchTensor newPaddedFFT = newFFTCrop(fullFFT, 3, 150, 150, 150);
-                    //TorchTensor newCroppedFFT = newFFTCrop(newPaddedFFT, 3, 50, 50, 50);
-
-                    //bool test = croppedFFT.AllClose(newCroppedFFT);
-                }
-            }
-
-            //Tesst FFT Crop vs warp crop
-            {
-                Image sourceVolumeOrg = Image.FromFile(@"D:\EMD\9233\emd_9233_2.0.mrc");
-                int cropDim = 100;
-
-                //Warp based Fourier Cropping for reference
-                Image WarpCropped = sourceVolumeOrg.AsScaled(new int3(100));
-
-                // Create a cropped volume using Torch Operator
-                TorchTensor TensorFullVolume = Float32Tensor.Zeros(new long[] { 1, sourceVolumeOrg.Dims.Z, sourceVolumeOrg.Dims.Y, sourceVolumeOrg.Dims.X }, DeviceType.CUDA, 0);
-                GPU.CopyDeviceToDevice(sourceVolumeOrg.GetDevice(Intent.Read), TensorFullVolume.DataPtr(), sourceVolumeOrg.ElementsReal);
-                GPU.CheckGPUExceptions();
-                TorchTensor TensorFFTFullVolume = TensorFullVolume.rfftn(new long[] { 1, 2, 3 });
-                TorchTensor TensorFFTCroppedVolume = FFTCrop(TensorFFTFullVolume, 3,cropDim, cropDim, cropDim);
-                TorchTensor TensorCroppedVolume = TensorFFTCroppedVolume.irfftn(new long[] { 1, 2, 3 });
-
-                TorchTensor TensorWarpCropped = Float32Tensor.Zeros(new long[] { 1, cropDim, cropDim, cropDim }, DeviceType.CUDA, 0);
-                GPU.CopyDeviceToDevice(WarpCropped.GetDevice(Intent.Read), TensorWarpCropped.DataPtr(), WarpCropped.ElementsReal);
-
-                bool isClose = TensorCroppedVolume.AllClose(TensorWarpCropped, 1E-5, 1E-5);
-                Debug.Assert(isClose, "Warp and torch cropping are not the same");
-                {
-                    Image croppedImage = new(new int3(cropDim));
-                    GPU.CopyDeviceToDevice(TensorWarpCropped.DataPtr(), croppedImage.GetDevice(Intent.Write), croppedImage.ElementsReal);
-                    croppedImage.WriteMRC("WarpCropped.mrc", true);
-                }
-                {
-                    Image croppedImage = new(new int3(cropDim));
-                    GPU.CopyDeviceToDevice(TensorCroppedVolume.DataPtr(), croppedImage.GetDevice(Intent.Write), croppedImage.ElementsReal);
-                    croppedImage.WriteMRC("OwnCropped.mrc", true);
-                }
-            }
+            
+        }
+    
+        static void Main(string[] args)
+        {
+            testVolumeScaling();
         }
     }
 }

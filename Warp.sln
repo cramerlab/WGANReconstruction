@@ -66,7 +66,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CubeNetDev", "CubeNetDev\Cu
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TildeDev", "TildeDev\TildeDev.csproj", "{467BD836-C691-4624-8A55-95B6EA9D1E27}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TildeDataLoader", "TildeDataLoader\TildeDataLoader.csproj", "{45767ABF-92D2-4CEA-A46A-F3A3D3E0267B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestCustomOperators", "TildeDataLoader\TestCustomOperators.csproj", "{45767ABF-92D2-4CEA-A46A-F3A3D3E0267B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DE0DFFEB-5F85-49D8-AD4B-208A369FD70F} = {DE0DFFEB-5F85-49D8-AD4B-208A369FD70F}
+	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GANReconDev", "GANReconDev\GANReconDev.csproj", "{B3622D99-AEA6-4AF6-954A-CC1C9014DBFC}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -75,7 +78,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GANReconDev", "GANReconDev\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GANRecon", "GANRecon\GANRecon.csproj", "{80429063-2250-46CF-9B3F-32AD85E32D4B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestGanRecon", "TestGanRecon\TestGanRecon.csproj", "{868EA992-0391-4610-ABCA-3044C51E1068}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestGanRecon", "TestGanRecon\TestGanRecon.csproj", "{868EA992-0391-4610-ABCA-3044C51E1068}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -216,6 +219,7 @@ Global
 		{467BD836-C691-4624-8A55-95B6EA9D1E27}.Release|x64.ActiveCfg = Release|Any CPU
 		{467BD836-C691-4624-8A55-95B6EA9D1E27}.Release|x64.Build.0 = Release|Any CPU
 		{45767ABF-92D2-4CEA-A46A-F3A3D3E0267B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45767ABF-92D2-4CEA-A46A-F3A3D3E0267B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{45767ABF-92D2-4CEA-A46A-F3A3D3E0267B}.Debug|x64.ActiveCfg = Debug|Any CPU
 		{45767ABF-92D2-4CEA-A46A-F3A3D3E0267B}.Debug|x64.Build.0 = Debug|Any CPU
 		{45767ABF-92D2-4CEA-A46A-F3A3D3E0267B}.Release|Any CPU.ActiveCfg = Release|Any CPU

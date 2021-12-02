@@ -69,5 +69,24 @@ namespace TorchSharp.NN
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSNN_AffineMatrixFromAngles(IntPtr angles, float shift);
+
+        static public TorchTensor AffineMatrixFromAngles(TorchTensor angles, float shift)
+        {
+            var res = THSNN_AffineMatrixFromAngles(angles.Handle, shift);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
+
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSNN_RotateVolume(IntPtr volume, IntPtr angles, float shift);
+
+        static public TorchTensor RotateVolume(TorchTensor volume, TorchTensor angles, float shift)
+        {
+            var res = THSNN_RotateVolume(volume.Handle, angles.Handle, shift);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
     }
 }

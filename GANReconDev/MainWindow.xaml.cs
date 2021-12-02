@@ -37,7 +37,7 @@ namespace ParticleWGANDev
             set { SetValue(LearningRateProperty, value); }
         }
 
-        public static readonly DependencyProperty LearningRateProperty = DependencyProperty.Register("LearningRate", typeof(decimal), typeof(MainWindow), new PropertyMetadata(0.001M));
+        public static readonly DependencyProperty LearningRateProperty = DependencyProperty.Register("LearningRate", typeof(decimal), typeof(MainWindow), new PropertyMetadata(0.0001M));
 
         
         private void CheckSaveRecs_Checked(object sender, RoutedEventArgs e) { ShouldSaveRecs = true; }
@@ -67,11 +67,11 @@ namespace ParticleWGANDev
         private double LowPass = 1.0;
 
         private int BatchSize = 8;
-        float Lambda = 0.001f;
-        int DiscIters = 4;
+        float Lambda = 0.01f;
+        int DiscIters = 8;
         bool TrainGen = true;
 
-        int NThreads = 3;
+        int NThreads = 2;
         int PreProcessingDevice = 1;
         int ProcessingDevice = 0;
 
@@ -147,36 +147,6 @@ namespace ParticleWGANDev
 
                 float3[] RandomParticleAngles = Helper.GetHealpixAngles(3).Select(s => s * Helper.ToRad).ToArray();
 
-                Image Weights2D = new Image(new int3(Dim, Dim, 1), true);
-                {
-                    //Weighting for projections
-                    float[] Weights = new float[Dim / 2];
-
-                    for (int r = 0; r < Weights.Length; r++)
-                    {
-                        float Sum = 0;
-
-                        float3 Point = new float3(r, 0, 0);
-
-                        for (int a = 0; a < RandomParticleAngles.Length; a++)
-                        {
-                            float3 Normal = Matrix3.Euler(RandomParticleAngles[a]).Transposed() * float3.UnitZ;
-                            float Dist = Math.Abs(float3.Dot(Normal, Point));
-                            Sum += Math.Max(0, 1 - Dist);
-                        }
-
-                        Weights[r] = 1f / Math.Max(1, Sum);
-                    }
-
-                    
-                    float[] Weights2DData = Weights2D.GetHost(Intent.ReadWrite)[0];
-                    int i = 0;
-                    Helper.ForEachElementFT(new int2(Dim), (x, y, xx, yy, r, angle) =>
-                    {
-                        Weights2DData[i++] = Weights[Math.Min(Weights.Length - 1, (int)Math.Round(r))];
-                    });
-                }
-                Weights2D.WriteMRC(Path.Combine(WorkingDirectory, "Weights2D.mrc"), true);
                 int numParticles = RandomParticleAngles.Length;
                 int currentEpoch = 0;
                 ParameterizedThreadStart ReloadLambda = (par) =>
@@ -185,28 +155,91 @@ namespace ParticleWGANDev
                     Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "Refine3D_CryoSparcSelected_run_class001.mrc"));
                     if (Dim_zoom != DimRaw)
                         TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - Dim_zoom) / 2), new int3(Dim_zoom));
-
+                    int Dim_volume = 128;
+                    TrefVolume= TrefVolume.AsScaled(new int3(Dim));
                     var TProj = new Projector(TrefVolume, 2);
-                    var TensorRefVolume = Float32Tensor.Empty(new long[] { 1, Dim_zoom, Dim_zoom, Dim_zoom }, DeviceType.CUDA, PreProcessingDevice);
+                    var TensorRefVolume = Float32Tensor.Empty(new long[] { 1, Dim_volume, Dim_volume, Dim_volume }, DeviceType.CUDA, PreProcessingDevice);
                     GPU.CopyDeviceToDevice(TrefVolume.GetDevice(Intent.Read), TensorRefVolume.DataPtr(), TrefVolume.ElementsReal);
-                    var TGenerator = TorchSharp.NN.Modules.ReconstructionWGANGenerator(TensorRefVolume, Dim_zoom);
+                    //var TGenerator = TorchSharp.NN.Modules.ReconstructionWGANGenerator(TensorRefVolume, Dim_volume);
                     var TensorAngles = Float32Tensor.Zeros(new long[] { BatchSize, 3 }, DeviceType.CUDA, PreProcessingDevice);
 
                     Random ReloadRand = new Random((int)par);
                     Random NoiseRand = new Random((int)par);
                     Random ShiftRand = new Random((int)par);
                     bool OwnBatchUsed = true;
-                    Image TWeights2d = Weights2D.GetCopyGPU();
+
                     
 
                     Image LoadStack = new Image(new int3(DimRaw, DimRaw, BatchSize));
 
                     Image[] TImagesReal = Helper.ArrayOfFunction(i => new Image(new int3(Dim, Dim, BatchSize)), DiscIters + 1);
-                    Image[] TImagesCTFFull = Helper.ArrayOfFunction(i => { Image im = new Image(new int3(Dim_zoom, Dim_zoom, BatchSize), true); im.Fill(1);return im; }, DiscIters + 1);
+                    Image[] TImagesCTFFull = Helper.ArrayOfFunction(i => { Image im = new Image(new int3(Dim_volume, Dim_volume, BatchSize), true); im.Fill(1);return im; }, DiscIters + 1);
                     Image[] TImagesCTFScaled = Helper.ArrayOfFunction(i => { Image im = new Image(new int3(Dim, Dim, BatchSize), true); im.Fill(1);return im; }, DiscIters + 1);
+                    Image CTFMaskFull = new Image(new int3(Dim_volume, Dim_volume, BatchSize), true);
+                    CTFMaskFull.Fill(1);
+                    Image CTFMaskScaled = new Image(new int3(Dim, Dim, BatchSize), true);
+                    CTFMaskScaled.Fill(1);
                     float[][] TImagesAngles = Helper.ArrayOfFunction(i => new float[BatchSize*3], DiscIters + 1);
-                    Image CTFCoordsFull = CTF.GetCTFCoords(Dim_zoom, Dim_zoom);
+                    Image CTFCoordsFull = CTF.GetCTFCoords(Dim_volume, Dim_volume);
                     Image CTFCoordsScaled = CTF.GetCTFCoords(Dim, Dim_zoom);
+                    CTFMaskFull.TransformValues((x, y, z, val) =>
+                    {
+                        float nyquistsoftedge = 0.05f;
+                        float yy = y >= CTFMaskFull.Dims.Y / 2 + 1 ? y - CTFMaskFull.Dims.Y : y;
+                        yy /= CTFMaskFull.Dims.Y / 2.0f;
+                        yy *= yy;
+
+
+                        float xx = x;
+                        xx /= CTFMaskFull.Dims.X / 2.0f;
+                        xx *= xx;
+
+                        float r = (float)Math.Sqrt(xx + yy);
+
+                        float filter = 1;
+                        if (nyquistsoftedge > 0)
+                        {
+                            float edgelow = (float)Math.Cos(Math.Min(1, Math.Max(0, 0 - r) / nyquistsoftedge) * Math.PI) * 0.5f + 0.5f;
+                            float edgehigh = (float)Math.Cos(Math.Min(1, Math.Max(0, (r - 1) / nyquistsoftedge)) * Math.PI) * 0.5f + 0.5f;
+                            filter = edgelow * edgehigh;
+                        }
+                        else
+                        {
+                            filter = (r >= 0 && r <= 1) ? 1 : 0;
+                        }
+
+                        return val * filter;
+                    });
+
+                    CTFMaskScaled.TransformValues((x, y, z, val) =>
+                    {
+                        float nyquistsoftedge = 0.05f;
+                        float yy = y >= CTFMaskScaled.Dims.Y / 2 + 1 ? y - CTFMaskScaled.Dims.Y : y;
+                        yy /= CTFMaskScaled.Dims.Y / 2.0f;
+                        yy *= yy;
+
+
+                        float xx = x;
+                        xx /= CTFMaskScaled.Dims.X / 2.0f;
+                        xx *= xx;
+
+                        float r = (float)Math.Sqrt(xx + yy);
+
+                        float filter = 1;
+                        if (nyquistsoftedge > 0)
+                        {
+                            float edgelow = (float)Math.Cos(Math.Min(1, Math.Max(0, 0 - r) / nyquistsoftedge) * Math.PI) * 0.5f + 0.5f;
+                            float edgehigh = (float)Math.Cos(Math.Min(1, Math.Max(0, (r - 1) / nyquistsoftedge)) * Math.PI) * 0.5f + 0.5f;
+                            filter = edgelow * edgehigh;
+                        }
+                        else
+                        {
+                            filter = (r >= 0 && r <= 1) ? 1 : 0;
+                        }
+
+                        return val * filter;
+                    });
+
 
                     int PlanForw = 0, PlanBack = 0;
                     if (DimRaw != Dim)
@@ -231,9 +264,9 @@ namespace ParticleWGANDev
                                 TImagesAngles[iterTrain] = Helper.ToInterleaved(theseAngles);
                                 GPU.CopyHostToDevice(TImagesAngles[iterTrain], TensorAngles.DataPtr(), TImagesAngles[iterTrain].Length);
 
-                                Image projected = TProj.ProjectToRealspace(new int2(Dim_zoom), theseAngles);
-                                /*{
-                                    var tensorproj = TGenerator.Forward(TensorAngles, false);
+                                Image projected = TProj.ProjectToRealspace(new int2(Dim_volume), theseAngles);
+                                /*using (TorchTensor tensorproj = TGenerator.Forward(TensorAngles, false))
+                                {
                                     GPU.CopyDeviceToDevice(tensorproj.DataPtr(), projected.GetDevice(Intent.Write), projected.ElementsReal);
                                 }*/
                                 float3[] shiftsPix = Helper.ArrayOfFunction(i =>
@@ -258,7 +291,7 @@ namespace ParticleWGANDev
 
                                 //projected.ShiftSlices(shiftsPix);
 
-                                float3[] shiftsRel = Helper.ArrayOfFunction(i => shiftsPix[i] * 1.0f / (Dim_zoom / 2), shiftsPix.Length);
+                                float3[] shiftsRel = Helper.ArrayOfFunction(i => shiftsPix[i] * 1.0f / (Dim_volume / 2), shiftsPix.Length);
                                 
 
                                 GPU.CheckGPUExceptions();
@@ -278,16 +311,23 @@ namespace ParticleWGANDev
                                   false,
                                   (uint)BatchSize);
                                 */
+                                /*
                                 {
                                     Image thisCTFSign = TImagesCTFFull[iterTrain].GetCopy();
                                     thisCTFSign.Sign();
                                     TImagesCTFFull[iterTrain].Multiply(thisCTFSign);
+                                    //TImagesCTFFull[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_CTFFull.mrc", true);
+                                    //TImagesCTFFull[iterTrain].Multiply(CTFMaskFull);
+                                    //TImagesCTFFull[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_CTFFullMasked.mrc", true);
                                     thisCTFSign.Dispose();
                                 }
                                 {
                                     Image thisCTFSign = TImagesCTFScaled[iterTrain].GetCopy();
                                     thisCTFSign.Sign();
                                     TImagesCTFScaled[iterTrain].Multiply(thisCTFSign);
+                                    //TImagesCTFScaled[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_CTFScaled.mrc", true);
+                                    //TImagesCTFScaled[iterTrain].Multiply(CTFMaskScaled);
+                                    //TImagesCTFScaled[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_CTFScaledMasked.mrc", true);
                                     thisCTFSign.Dispose();
                                 }
                                 {
@@ -296,7 +336,7 @@ namespace ParticleWGANDev
                                     fft.Multiply(TImagesCTFFull[iterTrain]);
                                     projected = fft.AsIFFT(false, 0, true);
                                     fft.Dispose();
-                                }
+                                }*/
                                 /*
                                 projected.TransformValues(val =>
                                 {
@@ -308,22 +348,11 @@ namespace ParticleWGANDev
                                     double randNormal = 0 + 1.0 * randStdNormal;
                                     return (float)(val + 0.1*randNormal);
                                 });*/
-                                TImagesCTFScaled[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_CTFScaled.mrc", true);
-                                TImagesCTFFull[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_CTFFull.mrc", true);
-
-
                                 Image projectedScaled = projected.AsScaled(new int2(Dim));
-                                projectedScaled.WriteMRC($@"{WorkingDirectory}\Thread_{par}_projectedScaled.mrc", true);
+
                                 projected.Dispose();
-                                /*{
-                                    Image fft = projectedScaled.AsFFT();
-                                    projectedScaled.Dispose();
-                                    fft.MultiplySlices(TWeights2d);
-                                    projectedScaled = fft.AsIFFT(false, 0, true);
-                                }*/
-                                projectedScaled.WriteMRC($@"{WorkingDirectory}\Thread_{par}_projectedScaledWeighted.mrc", true);
                                 GPU.CopyDeviceToDevice(projectedScaled.GetDevice(Intent.Read), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
-                                projectedScaled.Dispose();
+                                projectedScaled.Dispose();                                
                             }
                             
                             OwnBatchUsed = false;
@@ -368,13 +397,13 @@ namespace ParticleWGANDev
                         continue;
 
                     if((IterationsDone+1)*BatchSize < 2 * numParticles)
-                    {/*
+                    {
                         double clipVal = (IterationsDone + 1) * BatchSize * (DiscIters + 1) * 1e8 / (2 * numParticles);
                         TrainModel.set_discriminator_grad_clip_val(clipVal);
                         clipVal = (IterationsDone + 1) * BatchSize * (DiscIters + 1) * 1e4 / (2 * numParticles);
                         TrainModel.set_generator_grad_clip_val(clipVal);
-                        */
-                        TrainModel.set_generator_grad_clip_val(1e10);
+                        
+                        //TrainModel.set_generator_grad_clip_val(1e10);
                     }
 
                     ReloadBlock.WaitOne();

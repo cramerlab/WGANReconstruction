@@ -130,7 +130,7 @@ namespace Warp.NNModels
                     Mask.Dispose();
                 }
 
-                TorchTensor volume = Float32Tensor.Zeros(new long[] { 1, 1, boxDimensions.X, boxDimensions.X, boxDimensions.X });
+                TorchTensor volume = Float32Tensor.Zeros(new long[] { 1, 1, boxDimensions.X, boxDimensions.X, boxDimensions.X }, DeviceType.CUDA, DeviceID);
                 if (initialVolume != null)
                 {
                     volume = TensorExtensionMethods.ToTorchTensor(initialVolume.GetHostContinuousCopy(), new long[] { 1, 1, boxDimensions.X, boxDimensions.X, boxDimensions.X }).ToDevice(DeviceType.CUDA, DeviceID);
@@ -184,9 +184,7 @@ namespace Warp.NNModels
 
         public Image getVolume()
         {
-            var tensors = Generators[0].GetParameters();
-            var tensorVolume = Generators[0].GetParameters()[0];
-
+            var tensorVolume = Generators[0].Get_Volume();
             var imageVolume = new Image(new int3(this.BoxDimensions.X));
             GPU.CopyDeviceToDevice(tensorVolume.DataPtr(), imageVolume.GetDevice(Intent.Write), imageVolume.ElementsReal);
             imageVolume.FreeDevice();
@@ -230,7 +228,7 @@ namespace Warp.NNModels
 
             SyncParams();
             ResultPredicted.GetDevice(Intent.Write);
-            double thisGradNorm = 0.0d;
+            //double thisGradNorm = 0.0d;
             Helper.ForCPU(0, NDevices, NDevices, null, (i, threadID) =>
             {
                 Generators[i].Train();
@@ -256,16 +254,15 @@ namespace Warp.NNModels
                 using (TorchTensor PredictionNoisyNormalized = (PredictionNoisy - PredictionNoisyMean) /(PredictionNoisyStd + 1e-4))
                 //using (TorchTensor PredictionNoisyMasked = PredictionNoisyNormalized.Mul(TensorMask[i]))
                 using (TorchTensor PredictionNoisyMasked = PredictionNoisyNormalized)
-                
-                //using (TorchTensor IsItReal = Discriminators[i].Forward(PredictionNoisyMasked))
-                //using (TorchTensor Loss = ((-1) * IsItReal).Mean())
-                using(TorchTensor Loss = (PredictionConv- TensorTrueImages[i]).Pow(2).Sum())
+                using (TorchTensor IsItReal = Discriminators[i].Forward(PredictionNoisyMasked))
+                using (TorchTensor Loss = ((-1) * IsItReal).Mean())
+                //using(TorchTensor Loss = (PredictionConv- TensorTrueImages[i]).Pow(2).Sum())
                 {
 
                     GPU.CopyDeviceToDevice(Prediction.DataPtr(),
                                            ResultPredicted.GetDeviceSlice(i * DeviceBatch, Intent.Write),
                                            DeviceBatch * (int)BoxDimensions.Elements());
-                    GPU.CopyDeviceToDevice(PredictionNoisyMasked.DataPtr(),
+                    GPU.CopyDeviceToDevice(PredictionNoisy.DataPtr(),
                                            ResultPredictedNoisy.GetDeviceSlice(i * DeviceBatch, Intent.Write),
                                            DeviceBatch * (int)BoxDimensions.Elements());
                     if (i == 0)

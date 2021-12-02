@@ -29,7 +29,8 @@ EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_forward(const NNModule mo
 EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_project(const NNModule module, const Tensor angles, const double sigmashift);
 EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_forward_normalized(const NNModule module, const Tensor angles, const Tensor factor);
 EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_apply_noise(const NNModule module, const Tensor fakeimages, const Tensor ctf);
-EXPORT_API(double)     THSNN_ReconstructionWGANGenerator_clip_gradient(const NNModule module, const double clip_Value);
+EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_get_volume(const NNModule module);
+EXPORT_API(double)   THSNN_ReconstructionWGANGenerator_clip_gradient(const NNModule module, const double clip_Value);
 
 EXPORT_API(NNModule) THSNN_ReconstructionWGANDiscriminator_ctor(NNAnyModule* outAsAnyModule, int64_t boxsize);
 EXPORT_API(Tensor)   THSNN_ReconstructionWGANDiscriminator_forward(const NNModule module, const Tensor input);
@@ -66,3 +67,6 @@ EXPORT_API(Tensor) THSNN_Projector_GetData(const NNModule module);
 EXPORT_API(Tensor) THSNN_Projector_GetCorrectedVolume(const NNModule module);
 
 EXPORT_API(Tensor) THSNN_MatrixFromAngles(Tensor angles);
+EXPORT_API(Tensor) THSNN_AffineMatrixFromAngles(Tensor angles, float shift);
+EXPORT_API(Tensor) THSNN_RotateVolume(Tensor volume, Tensor angles, float shift);
+EXPORT_API(Tensor) THSNN_ScaleVolume(Tensor volume, int dim, int new_x, int new_y, int new_z);

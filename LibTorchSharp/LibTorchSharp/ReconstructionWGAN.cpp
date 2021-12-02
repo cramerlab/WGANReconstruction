@@ -16,6 +16,8 @@
 
 #include "MultiGPUModule.h"
 #include "SpectralNormalization.h"
+#include "CustomOperatorsAutograd.h"
+
 extern torch::Tensor matrix_from_angles(torch::Tensor& angles);
 
 struct ReconstructionWGANResidualBlock : MultiGPUModule
@@ -162,14 +164,17 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
 
     int64_t _boxsize;
 
-
+    bool alignCorners = true;
     torch::Tensor _volume;
     torch::Tensor _sigmashift;
-
+    float _oversamplimg;
+    int64_t _oversampledBoxsize;
     ReconstructionWGANGeneratorImpl(torch::Tensor & volume, int64_t boxsize)
     {
         _boxsize = boxsize;
-
+        _oversamplimg = 4;
+        _oversampledBoxsize = 128;
+        
         int currentchannels = 4;
         int currentsize = _boxsize;
         while (currentsize / 2 >= 4)
@@ -177,8 +182,8 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
             currentchannels *= 2;
             currentsize /= 2;
         }
-
-        _volume = register_parameter("volume", volume);
+        torch::Tensor oversampledVol = _oversampledBoxsize != _boxsize? scaleVolume(volume, 3, _oversampledBoxsize, _oversampledBoxsize, _oversampledBoxsize): volume;
+        _volume = register_parameter("volume", oversampledVol);
         _sigmashift = register_parameter("sigmaShift", torch::zeros({ 1 }, torch::TensorOptions().dtype(torch::kFloat)));
         // Additive noise
         {
@@ -217,20 +222,22 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
     {
 
         torch::Tensor trans_matrices = matrix_from_angles(angles);
+
         torch::Tensor shifts = torch::zeros({ angles.size(0), 3, 1 }, angles.options());;
         if (do_shift) {
             shifts = torch::randn({ angles.size(0), 3, 1 }, angles.options()) * _sigmashift;
             //shifts = shifts.minimum(torch::ones_like(shifts) * _sigmashift * 3);
         }
+        trans_matrices = trans_matrices.transpose(1, 2);
         trans_matrices = torch::cat({ trans_matrices, shifts }, 2);
         trans_matrices = trans_matrices.to(_volume.device());
-        torch::Tensor trans_grid = torch::nn::functional::affine_grid(trans_matrices, { angles.size(0), 1, _boxsize, _boxsize, _boxsize }, true);
+        torch::Tensor trans_grid = torch::nn::functional::affine_grid(trans_matrices, { angles.size(0), 1, _oversampledBoxsize, _oversampledBoxsize, _oversampledBoxsize }, alignCorners);
         torch::Tensor volumeRot = torch::nn::functional::grid_sample(_volume.size(0) < angles.size(0) ? _volume.expand(c10::IntArrayRef(new int64_t[]{ angles.size(0), -1, -1, -1, -1 }, 5)) : _volume,
-            trans_grid, torch::nn::functional::GridSampleFuncOptions().padding_mode(torch::kZeros).align_corners(true));
+            trans_grid, torch::nn::functional::GridSampleFuncOptions().padding_mode(torch::kZeros).align_corners(alignCorners));
 
         auto proj = volumeRot.sum(2);
-
-        return proj;
+        auto proj_scaled = scaleVolume(proj, 2, _boxsize, _boxsize, -1);
+        return proj_scaled;
     }
 
     torch::Tensor project(torch::Tensor angles, double sigmashift)
@@ -244,12 +251,13 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
         }
         else
             shifts = torch::zeros({ angles.size(0), 3, 1 }, angles.options());
-
+        
         trans_matrices = torch::cat({ trans_matrices, shifts }, 2);
         trans_matrices = trans_matrices.to(_volume.device());
-        torch::Tensor trans_grid = torch::nn::functional::affine_grid(trans_matrices, { angles.size(0), 1, _boxsize, _boxsize, _boxsize }, true);
+        
+        torch::Tensor trans_grid = torch::nn::functional::affine_grid(trans_matrices, { angles.size(0), 1, _boxsize, _boxsize, _boxsize }, alignCorners);
         torch::Tensor volumeRot = torch::nn::functional::grid_sample(_volume.size(0) < angles.size(0) ? _volume.expand(c10::IntArrayRef(new int64_t[]{angles.size(0), -1, -1, -1, -1}, 5)) : _volume,
-            trans_grid, torch::nn::functional::GridSampleFuncOptions().padding_mode(torch::kZeros).align_corners(true));
+            trans_grid, torch::nn::functional::GridSampleFuncOptions().padding_mode(torch::kZeros).align_corners(alignCorners));
 
         auto proj = volumeRot.sum(2);
 
@@ -267,9 +275,9 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
         trans_matrices = trans_matrices.to(_volume.device());
 
         torch::Tensor Volume = _volume * factor;
-        torch::Tensor trans_grid = torch::nn::functional::affine_grid(trans_matrices, { angles.size(0), 1, _boxsize, _boxsize, _boxsize }, true);
+        torch::Tensor trans_grid = torch::nn::functional::affine_grid(trans_matrices, { angles.size(0), 1, _boxsize, _boxsize, _boxsize }, alignCorners);
         torch::Tensor volumeRot = torch::nn::functional::grid_sample(Volume.size(0) < angles.size(0) ? Volume.expand(c10::IntArrayRef(new int64_t[]{ angles.size(0), -1, -1, -1, -1 }, 5)) : Volume,
-            trans_grid, torch::nn::functional::GridSampleFuncOptions().padding_mode(torch::kZeros).align_corners(true));
+            trans_grid, torch::nn::functional::GridSampleFuncOptions().padding_mode(torch::kZeros).align_corners(alignCorners));
 
         auto proj = volumeRot.sum(2);
 
@@ -302,6 +310,11 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
     }
 
     torch::Tensor get_Volume() {
+        torch::Tensor smallerVolume = _boxsize!=_oversampledBoxsize? scaleVolume(_volume, 3, _boxsize, _boxsize, _boxsize): _volume;
+        return smallerVolume;
+    }
+
+    torch::Tensor get_OversampledVolume() {
         return _volume;
     }
 
@@ -323,7 +336,7 @@ struct ReconstructionWGANDiscriminatorImpl : MultiGPUModule
                 
 
                 Discriminator->push_back(SpNormConv2d(torch::nn::Conv2dOptions(1, 96, 3).stride(1).padding(1)));
-                //Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
+                Discriminator->push_back(torch::nn::MaxPool2d(torch::nn::MaxPool2dOptions(2).stride(2)));
                 Discriminator->push_back(torch::nn::LeakyReLU(torch::nn::LeakyReLUOptions().negative_slope(0.1)));
 
 
@@ -468,7 +481,7 @@ NNModule THSNN_ReconstructionWGANGenerator_ctor(Tensor volume, int64_t boxsize, 
 }
 
 double THSNN_ReconstructionWGANGenerator_clip_gradient(const NNModule module, const double clip_Value) {
-    return torch::nn::utils::clip_grad_norm_({ (*module)->as<ReconstructionWGANGeneratorImpl>()->get_Volume() }, clip_Value, std::numeric_limits<double>::infinity());
+    return torch::nn::utils::clip_grad_norm_({ (*module)->as<ReconstructionWGANGeneratorImpl>()->get_OversampledVolume() }, clip_Value, std::numeric_limits<double>::infinity());
 }
 
 Tensor THSNN_ReconstructionWGANGenerator_project(const NNModule module, const Tensor angles, const double sigmashift)
@@ -489,6 +502,11 @@ Tensor THSNN_ReconstructionWGANGenerator_forward_normalized(const NNModule modul
 Tensor THSNN_ReconstructionWGANGenerator_apply_noise(const NNModule module, const Tensor fakeimages, const Tensor ctf)
 {
     CATCH_TENSOR((*module)->as<ReconstructionWGANGeneratorImpl>()->apply_noise(*fakeimages, *ctf));
+}
+
+Tensor THSNN_ReconstructionWGANGenerator_get_volume(const NNModule module)
+{
+    CATCH_TENSOR((*module)->as<ReconstructionWGANGeneratorImpl>()->get_Volume());
 }
 
 
