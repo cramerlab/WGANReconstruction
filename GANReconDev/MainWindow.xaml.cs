@@ -37,7 +37,7 @@ namespace ParticleWGANDev
             set { SetValue(LearningRateProperty, value); }
         }
 
-        public static readonly DependencyProperty LearningRateProperty = DependencyProperty.Register("LearningRate", typeof(decimal), typeof(MainWindow), new PropertyMetadata(0.0001M));
+        public static readonly DependencyProperty LearningRateProperty = DependencyProperty.Register("LearningRate", typeof(decimal), typeof(MainWindow), new PropertyMetadata(0.0002M));
 
         
         private void CheckSaveRecs_Checked(object sender, RoutedEventArgs e) { ShouldSaveRecs = true; }
@@ -57,7 +57,7 @@ namespace ParticleWGANDev
 
         const int Dim = 64;
         const int Dim_zoom = 128;
-        const decimal reduction = 0.99M;
+        const decimal reduction = 0.9M;
         const double sigmaShiftPix = 0.5;
         const double sigmaShiftRel = sigmaShiftPix / (Dim_zoom / 2);
         /*
@@ -66,14 +66,14 @@ namespace ParticleWGANDev
         */
         private double LowPass = 1.0;
 
-        private int BatchSize = 8;
+        private int BatchSize = 16;
         float Lambda = 0.01f;
         int DiscIters = 8;
         bool TrainGen = true;
 
         int NThreads = 2;
-        int PreProcessingDevice = 1;
-        int ProcessingDevice = 0;
+        int PreProcessingDevice = 0;
+        int ProcessingDevice = 1;
 
         public MainWindow()
         {
@@ -93,7 +93,7 @@ namespace ParticleWGANDev
                 Torch.SetSeed(seed);
                 //ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 32, new[] { 1 }, BatchSize);
                 //Image refVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
-                ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), new[] { ProcessingDevice }, BatchSize);
+                ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), new[] { 1,2 }, BatchSize);
                 TrainModel.SigmaShift = sigmaShiftRel;
                 //TrainModel.Load(@"D:\GAN_recon_polcompl\ParticleWGAN_SN_20210910_161349.pt");
                 WriteToLog("Done. (" + GPU.GetFreeMemory(ProcessingDevice) + " MB free)");
@@ -295,7 +295,7 @@ namespace ParticleWGANDev
                                 
 
                                 GPU.CheckGPUExceptions();
-                                /*
+                                
                                 GPU.CreateCTF(TImagesCTFFull[iterTrain].GetDevice(Intent.Write),
                                               CTFCoordsFull.GetDevice(Intent.Read),
                                               IntPtr.Zero,
@@ -310,14 +310,14 @@ namespace ParticleWGANDev
                                   Helper.IndexedSubset(AllParticleCTF, SubsetIDs).Select(c => c.ToStruct()).ToArray(),
                                   false,
                                   (uint)BatchSize);
-                                */
-                                /*
+                                
+                                
                                 {
                                     Image thisCTFSign = TImagesCTFFull[iterTrain].GetCopy();
                                     thisCTFSign.Sign();
                                     TImagesCTFFull[iterTrain].Multiply(thisCTFSign);
                                     //TImagesCTFFull[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_CTFFull.mrc", true);
-                                    //TImagesCTFFull[iterTrain].Multiply(CTFMaskFull);
+                                    TImagesCTFFull[iterTrain].Multiply(CTFMaskFull);
                                     //TImagesCTFFull[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_CTFFullMasked.mrc", true);
                                     thisCTFSign.Dispose();
                                 }
@@ -326,7 +326,7 @@ namespace ParticleWGANDev
                                     thisCTFSign.Sign();
                                     TImagesCTFScaled[iterTrain].Multiply(thisCTFSign);
                                     //TImagesCTFScaled[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_CTFScaled.mrc", true);
-                                    //TImagesCTFScaled[iterTrain].Multiply(CTFMaskScaled);
+                                    TImagesCTFScaled[iterTrain].Multiply(CTFMaskScaled);
                                     //TImagesCTFScaled[iterTrain].WriteMRC($@"{WorkingDirectory}\Thread_{par}_CTFScaledMasked.mrc", true);
                                     thisCTFSign.Dispose();
                                 }
@@ -336,7 +336,7 @@ namespace ParticleWGANDev
                                     fft.Multiply(TImagesCTFFull[iterTrain]);
                                     projected = fft.AsIFFT(false, 0, true);
                                     fft.Dispose();
-                                }*/
+                                }
                                 /*
                                 projected.TransformValues(val =>
                                 {
