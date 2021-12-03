@@ -93,7 +93,7 @@ namespace ParticleWGANDev
                 Torch.SetSeed(seed);
                 //ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 32, new[] { 1 }, BatchSize);
                 //Image refVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
-                ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), new[] { 1,2 }, BatchSize);
+                ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), new[] { 1 }, BatchSize);
                 TrainModel.SigmaShift = sigmaShiftRel;
                 //TrainModel.Load(@"D:\GAN_recon_polcompl\ParticleWGAN_SN_20210910_161349.pt");
                 WriteToLog("Done. (" + GPU.GetFreeMemory(ProcessingDevice) + " MB free)");
@@ -337,7 +337,7 @@ namespace ParticleWGANDev
                                     projected = fft.AsIFFT(false, 0, true);
                                     fft.Dispose();
                                 }
-                                /*
+                                
                                 projected.TransformValues(val =>
                                 {
                                     //https://stackoverflow.com/a/218600/5012099
@@ -347,7 +347,7 @@ namespace ParticleWGANDev
                                                  Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
                                     double randNormal = 0 + 1.0 * randStdNormal;
                                     return (float)(val + 0.1*randNormal);
-                                });*/
+                                });
                                 Image projectedScaled = projected.AsScaled(new int2(Dim));
 
                                 projected.Dispose();
