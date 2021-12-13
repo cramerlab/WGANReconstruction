@@ -206,7 +206,62 @@ torch::Tensor complexGridSample_autograd(const torch::Tensor& input, const torch
 	return ComplexGridSample::apply(input, grid);
 }
 
+//Grid Sample and Project Part
 
+torch::Tensor gridSampleAndProject(const torch::Tensor& input, const torch::Tensor& grid) {
+	static auto op = torch::Dispatcher::singleton()
+		.findSchemaOrThrow("myops::gridSampleAndProject", "")
+		.typed<decltype(gridSampleAndProject)>();
+	// Make sure that we have expected dimensionality for the lower level function calls
+	//TORCH_CHECK(intensities.dim() == 2 && positions.dim() == 3 && orientation.dim() == 3 && shift.dim() == 2);
+	//TORCH_CHECK(intensities.size(0) == positions.size(0) && orientation.size(0) == positions.size(0) && shift.size(0) == positions.size(0));
+	return op.call(input, grid);
+}
+
+tensor_list gridSampleAndProject_backwards(const torch::Tensor& grad_output, const torch::Tensor& input, const torch::Tensor& grid) {
+	static auto op = torch::Dispatcher::singleton()
+		.findSchemaOrThrow("myops::gridSampleAndProject_backwards", "")
+		.typed<decltype(gridSampleAndProject_backwards)>();
+	return op.call(grad_output, input, grid);
+}
+
+class GridSampleAndProject : public Function<GridSampleAndProject>
+{
+public:
+	static torch::Tensor forward(
+		AutogradContext* ctx, torch::Tensor input, torch::Tensor grid) {
+		ctx->save_for_backward({ input, grid });
+
+		at::AutoNonVariableTypeMode g;
+		return gridSampleAndProject(input, grid);
+	}
+
+	static tensor_list backward(AutogradContext* ctx, tensor_list grad_outputs) {
+		auto saved = ctx->get_saved_variables();
+		auto ret = gridSampleAndProject_backwards(grad_outputs[0], saved[0], saved[1]);
+		return ret;
+	}
+};
+
+torch::Tensor gridSampleAndProject_cuda(const torch::Tensor& input, const torch::Tensor& grid) {
+
+	auto dims = input.sizes().vec();
+	TORCH_CHECK(input.sizes()[0]==1 && input.dim() == 5)
+			return at::native::MyOperator::grid_sampler_and_project_3d_cuda(input, grid, static_cast<int>(at::native::GridSamplerInterpolation::Bilinear), static_cast<int>(at::native::GridSamplerPadding::Zeros), true);
+}
+
+tensor_list gridSampleAndProject_backwards_cuda(const torch::Tensor& grad_output, const torch::Tensor& input, const torch::Tensor& grid) {
+	TORCH_CHECK(input.dim() == 5)
+
+			std::tuple<torch::Tensor, torch::Tensor> ret = at::native::MyOperator::grid_sampler_and_project_3d_backward_cuda(grad_output, input, grid,
+				static_cast<int>(at::native::GridSamplerInterpolation::Bilinear), static_cast<int>(at::native::GridSamplerPadding::Zeros), true);
+			return  { std::get<0>(ret), std::get<1>(ret) };
+	
+}
+
+torch::Tensor gridSampleAndProject_autograd(const torch::Tensor& input, const torch::Tensor& grid) {
+	return GridSampleAndProject::apply(input, grid);
+}
 
 // Dispatcher definitions
 
@@ -217,6 +272,8 @@ TORCH_LIBRARY(myops, m) {
 	m.def("projectAtoms_backwards", projectAtoms_backwards);
 	m.def("complexGridSample", complexGridSample);
 	m.def("complexGridSample_backwards", complexGridSample_backwards);
+	m.def("gridSampleAndProject", gridSampleAndProject);
+	m.def("gridSampleAndProject_backwards", gridSampleAndProject_backwards);
 }
 
 TORCH_LIBRARY_IMPL(myops, CUDA, m) {
@@ -226,6 +283,8 @@ TORCH_LIBRARY_IMPL(myops, CUDA, m) {
 	m.impl("projectAtoms_backwards", projectAtoms_backwards_cuda);
 	m.impl("complexGridSample", complexGridSample_cuda);
 	m.impl("complexGridSample_backwards", complexGridSample_backwards_cuda);
+	m.impl("gridSampleAndProject", gridSampleAndProject_cuda);
+	m.impl("gridSampleAndProject_backwards", gridSampleAndProject_backwards_cuda);
 }
 
 TORCH_LIBRARY_IMPL(myops, CPU, m) {
@@ -237,4 +296,5 @@ TORCH_LIBRARY_IMPL(myops, Autograd, m) {
 	m.impl("atoms_to_grid", atoms_to_grid_autograd);
 	m.impl("projectAtoms", projectAtoms_autograd);
 	m.impl("complexGridSample", complexGridSample_autograd);
+	m.impl("gridSampleAndProject", gridSampleAndProject_autograd);
 }

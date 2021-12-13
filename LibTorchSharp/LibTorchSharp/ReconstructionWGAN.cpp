@@ -173,7 +173,7 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
     {
         _boxsize = boxsize;
         _oversamplimg = 4;
-        _oversampledBoxsize = 128;
+        _oversampledBoxsize = boxsize;
         
         int currentchannels = 4;
         int currentsize = _boxsize;
@@ -236,8 +236,42 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
             trans_grid, torch::nn::functional::GridSampleFuncOptions().padding_mode(torch::kZeros).align_corners(alignCorners));
 
         auto proj = volumeRot.sum(2);
-        auto proj_scaled = scaleVolume(proj, 2, _boxsize, _boxsize, -1);
-        return proj_scaled;
+        if (_oversampledBoxsize != _boxsize)
+            proj = scaleVolume(proj, 2, _boxsize, _boxsize, -1);
+        return proj;
+    }
+
+    torch::Tensor forward_new(torch::Tensor angles, bool do_shift)
+    {
+
+        torch::Tensor trans_matrices = matrix_from_angles(angles);
+
+        torch::Tensor shifts = torch::zeros({ angles.size(0), 3, 1 }, angles.options());;
+        if (do_shift) {
+            shifts = torch::randn({ angles.size(0), 3, 1 }, angles.options()) * _sigmashift;
+            //shifts = shifts.minimum(torch::ones_like(shifts) * _sigmashift * 3);
+        }
+        trans_matrices = trans_matrices.transpose(1, 2);
+        trans_matrices = torch::cat({ trans_matrices, shifts }, 2);
+        trans_matrices = trans_matrices.to(_volume.device());
+        torch::Tensor trans_grid = torch::nn::functional::affine_grid(trans_matrices, { angles.size(0), 1, _oversampledBoxsize, _oversampledBoxsize, _oversampledBoxsize }, alignCorners);
+
+        auto deviceVol = _volume.device();
+        auto dimsVol = _volume.sizes().vec();
+        auto deviceGrid = trans_grid.device();
+        auto dimsGrid = trans_grid.sizes().vec();
+        auto proj = gridSampleAndProject(_volume, trans_grid);
+        auto dimsAngles = angles.sizes().vec();
+        auto size = angles.size(0) * _oversampledBoxsize * _oversampledBoxsize;
+        float * projFlat = new float[angles.size(0) * _oversampledBoxsize * _oversampledBoxsize];
+        auto projFlatDims = proj.sizes().vec();
+        auto err = cudaPeekAtLastError();
+        //cudaDeviceSynchronize();
+        cudaMemcpy(projFlat, proj.data_ptr(), angles.size(0) * _oversampledBoxsize * _oversampledBoxsize * sizeof(float), cudaMemcpyDeviceToHost);
+        //cudaDeviceSynchronize();
+        if (_oversampledBoxsize != _boxsize)
+            proj = scaleVolume(proj, 2, _boxsize, _boxsize, -1);
+        return proj;
     }
 
     torch::Tensor project(torch::Tensor angles, double sigmashift)
@@ -492,6 +526,11 @@ Tensor THSNN_ReconstructionWGANGenerator_project(const NNModule module, const Te
 Tensor THSNN_ReconstructionWGANGenerator_forward(const NNModule module, const Tensor angles, const bool do_shift)
 {
     CATCH_TENSOR((*module)->as<ReconstructionWGANGeneratorImpl>()->forward(*angles, do_shift));
+}
+
+Tensor THSNN_ReconstructionWGANGenerator_forward_new(const NNModule module, const Tensor angles, const bool do_shift)
+{
+    CATCH_TENSOR((*module)->as<ReconstructionWGANGeneratorImpl>()->forward_new(*angles, do_shift));
 }
 
 Tensor THSNN_ReconstructionWGANGenerator_forward_normalized(const NNModule module, const Tensor angles, const Tensor factor)

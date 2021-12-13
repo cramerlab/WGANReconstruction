@@ -47,6 +47,16 @@ namespace TorchSharp.NN
         }
 
         [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSNN_ReconstructionWGANGenerator_forward_new(Module.HType module, IntPtr angles, bool do_shift);
+
+        public TorchTensor ForwardNew(TorchTensor angles, bool do_shift)
+        {
+            var res = THSNN_ReconstructionWGANGenerator_forward_new(handle, angles.Handle, do_shift);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
+
+        [DllImport("LibTorchSharp")]
         private static extern IntPtr THSNN_ReconstructionWGANGenerator_forward_normalized(Module.HType module, IntPtr angles, IntPtr factor);
 
         public TorchTensor Forward_Normalized(TorchTensor angles, TorchTensor factor)

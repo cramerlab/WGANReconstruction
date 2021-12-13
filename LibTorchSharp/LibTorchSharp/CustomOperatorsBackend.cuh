@@ -49,6 +49,15 @@ namespace at {
                 complex_grid_sampler_3d_backward_cuda(const Tensor& grad_output, const Tensor& input,
                     const Tensor& grid, int interpolation_mode, int padding_mode,
                     bool align_corners);
+
+            Tensor grid_sampler_and_project_3d_cuda(const Tensor& input, const Tensor& grid,
+                int64_t interpolation_mode, int64_t padding_mode,
+                bool align_corners);
+
+            std::tuple<Tensor, Tensor>
+                grid_sampler_and_project_3d_backward_cuda(const Tensor& grad_output, const Tensor& input,
+                    const Tensor& grid, int64_t interpolation_mode, int64_t padding_mode,
+                    bool align_corners);
         }
     }
 }

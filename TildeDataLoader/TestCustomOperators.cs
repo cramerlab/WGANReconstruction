@@ -807,10 +807,75 @@ namespace TestCustomOperators
 
             
         }
-    
+
+        static void TestGridSampleAndProject()
+        {
+            int processingDevice = 0;
+            GPU.SetDevice(processingDevice);
+            Image sourceVolumeOrg = Image.FromFile(@"D:\EMD\9233\emd_9233_2.0.mrc");
+
+
+            float3[] AllAngles = Helper.GetHealpixAngles(3).Select(s => s * Helper.ToRad).ToArray();
+
+            //Warp based Fourier Cropping for reference
+            Image sourceVolume = sourceVolumeOrg.AsScaled(new int3(64));
+            sourceVolume.WriteMRC("WarpCropped.mrc", true);
+
+            // Create a cropped volume using Torch Operator
+            TorchTensor TensorFullVolume = Float32Tensor.Random(new long[] { 1, 1, sourceVolumeOrg.Dims.Z, sourceVolumeOrg.Dims.Y, sourceVolumeOrg.Dims.X }, DeviceType.CUDA, processingDevice);
+            GPU.CopyDeviceToDevice(sourceVolumeOrg.GetDevice(Intent.Read), TensorFullVolume.DataPtr(), sourceVolumeOrg.ElementsReal);
+
+            TorchTensor TensorOwnScaledVolume = ScaleVolume(TensorFullVolume, 3, 64, 64, 64);
+            Image imageOwnScaledVolume = new Image(new int3(64));
+            GPU.CopyDeviceToDevice(TensorOwnScaledVolume.DataPtr(), imageOwnScaledVolume.GetDevice(Intent.Write), imageOwnScaledVolume.ElementsReal);
+            imageOwnScaledVolume.WriteMRC("imageOwnScaledVolume.mrc", true);
+
+            TorchTensor TensorWarpScaledVolume = Float32Tensor.Random(new long[] { 1, 1, sourceVolume.Dims.Z, sourceVolume.Dims.Y, sourceVolume.Dims.X }, DeviceType.CUDA, processingDevice);
+            GPU.CopyDeviceToDevice(sourceVolume.GetDevice(Intent.Read), TensorWarpScaledVolume.DataPtr(), sourceVolume.ElementsReal);
+
+            ReconstructionWGANGenerator RefGen = ReconstructionWGANGenerator(TensorOwnScaledVolume, 64);
+            RefGen.ToCuda(processingDevice);
+
+            TorchTensor EmptyVol = Float32Tensor.Zeros(TensorOwnScaledVolume.Shape, DeviceType.CUDA, processingDevice);
+            ReconstructionWGANGenerator TargetGen = ReconstructionWGANGenerator(EmptyVol, 64);
+            TargetGen.ToCuda(processingDevice);
+
+            //Set stuff needed for a quick reconstruction
+            int batchSize = 256;
+            TorchTensor tensorAngles = Float32Tensor.Empty(new long[] { batchSize, 3 }, DeviceType.CUDA, 1);
+            Optimizer optim = Optimizer.Adam(TargetGen.GetParameters(), 0.1, 1e-4);
+            Random ReloadRand = new Random(42);
+            for (int i = 0; i < 1000; i++)
+            {
+                optim.ZeroGrad();
+                int[] AngleIds = Helper.ArrayOfFunction(i => ReloadRand.Next(0, AllAngles.Length), batchSize);
+
+                // Read, and copy or rescale real and fake images from prepared stacks
+
+                float3[] theseAngles = Helper.IndexedSubset(AllAngles, AngleIds);
+                GPU.CopyHostToDevice(Helper.ToInterleaved(theseAngles), tensorAngles.DataPtr(), batchSize * 3);
+                using (TorchTensor RefProj = RefGen.Forward(tensorAngles, false))
+                using (TorchTensor TargetProj = TargetGen.ForwardNew(tensorAngles, false))
+                using (TorchTensor Loss = (RefProj - TargetProj).Pow(2).Sum().Mean())
+                {
+                    Loss.Backward();
+                    optim.Step();
+                    if (i % 100 == 0 || i == 1000 - 1)
+                    {
+                        Image imageRefProj = new Image(new int3(64, 64, batchSize));
+                        GPU.CopyDeviceToDevice(RefProj.DataPtr(), imageRefProj.GetDevice(Intent.Write), imageRefProj.ElementsReal);
+                        imageRefProj.WriteMRC($"imageRefProj_{i}.mrc", true);
+                        Image imageTargetProj = new Image(new int3(64, 64, batchSize));
+                        GPU.CopyDeviceToDevice(TargetProj.DataPtr(), imageTargetProj.GetDevice(Intent.Write), imageTargetProj.ElementsReal);
+                        imageTargetProj.WriteMRC($"imageTargetProj_{i}.mrc", true);
+                    }
+                }
+            }
+        }
+
         static void Main(string[] args)
         {
-            testVolumeScaling();
+            TestGridSampleAndProject();
         }
     }
 }
