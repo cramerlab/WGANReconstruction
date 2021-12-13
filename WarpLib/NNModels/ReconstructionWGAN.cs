@@ -52,7 +52,7 @@ namespace Warp.NNModels
         private double sigmaShift = 0;
 
         private bool IsDisposed = false;
-        private bool doShift = true;
+        private bool doShift = false;
 
         private double GenVolumeBoost = 10;
         private double GenBoost = 1;

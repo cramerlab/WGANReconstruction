@@ -289,7 +289,7 @@ namespace ParticleWGANDev
                                     return new float3(x, y, 0);
                                 }, projected.Dims.Z);
 
-                                projected.ShiftSlices(shiftsPix);
+                                //projected.ShiftSlices(shiftsPix);
 
                                 float3[] shiftsRel = Helper.ArrayOfFunction(i => shiftsPix[i] * 1.0f / (Dim_volume / 2), shiftsPix.Length);
                                 
@@ -346,7 +346,7 @@ namespace ParticleWGANDev
                                     double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) *
                                                  Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
                                     double randNormal = 0 + 1.0 * randStdNormal;
-                                    return (float)(val + 0.1*randNormal);
+                                    return (float)(val + randNormal);
                                 });
                                 Image projectedScaled = projected.AsScaled(new int2(Dim));
 
