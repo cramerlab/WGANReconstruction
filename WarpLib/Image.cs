@@ -29,7 +29,7 @@ namespace Warp
         private static int LifetimeObjectCounter = 0;
         private static readonly List<int> LifetimeObjectIDs = new List<int>();
         private static readonly List<Image> LifetimeObjects = new List<Image>();
-        private static readonly bool EnableObjectLogging = false;
+        private static readonly bool EnableObjectLogging = true;
 
         private static readonly HashSet<Image> OnDeviceObjects = new HashSet<Image>();
         public static void FreeDeviceAll()

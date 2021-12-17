@@ -61,6 +61,7 @@ torch::Tensor rotateVolume(torch::Tensor& volume, torch::Tensor& angles, float s
 }
 
 torch::Tensor scaleVolume(torch::Tensor& volume, int dim, int new_x, int new_y, int new_z) {
+
     if (dim == 2) {
         torch::Tensor fft_volume = torch::fft::rfftn(volume, c10::nullopt, c10::IntArrayRef({ (int64_t)volume.dim() - 2, (int64_t)volume.dim() - 1 }), "forward");
         torch::Tensor new_fft_volume = fft_crop(fft_volume, dim, new_x, new_y, new_z);

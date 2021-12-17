@@ -810,7 +810,7 @@ namespace TestCustomOperators
 
         static void TestGridSampleAndProject()
         {
-            int processingDevice = 0;
+            int processingDevice = 1;
             GPU.SetDevice(processingDevice);
             Image sourceVolumeOrg = Image.FromFile(@"D:\EMD\9233\emd_9233_2.0.mrc");
 
@@ -841,7 +841,7 @@ namespace TestCustomOperators
             TargetGen.ToCuda(processingDevice);
 
             //Set stuff needed for a quick reconstruction
-            int batchSize = 256;
+            int batchSize = 32;
             TorchTensor tensorAngles = Float32Tensor.Empty(new long[] { batchSize, 3 }, DeviceType.CUDA, 1);
             Optimizer optim = Optimizer.Adam(TargetGen.GetParameters(), 0.1, 1e-4);
             Random ReloadRand = new Random(42);

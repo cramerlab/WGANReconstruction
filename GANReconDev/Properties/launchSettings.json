@@ -2,6 +2,7 @@
   "profiles": {
     "GANReconDev": {
       "commandName": "Project",
+      "commandLineArgs": "16 0.001 0.99 0.33 4 D:\\someFile.txt D:\\someDirectory",
       "nativeDebugging": true
     }
   }

@@ -173,7 +173,7 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
     {
         _boxsize = boxsize;
         _oversamplimg = 4;
-        _oversampledBoxsize = boxsize;
+        _oversampledBoxsize = 128;
         
         int currentchannels = 4;
         int currentsize = _boxsize;
@@ -256,21 +256,25 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
         trans_matrices = trans_matrices.to(_volume.device());
         torch::Tensor trans_grid = torch::nn::functional::affine_grid(trans_matrices, { angles.size(0), 1, _oversampledBoxsize, _oversampledBoxsize, _oversampledBoxsize }, alignCorners);
 
-        auto deviceVol = _volume.device();
-        auto dimsVol = _volume.sizes().vec();
-        auto deviceGrid = trans_grid.device();
-        auto dimsGrid = trans_grid.sizes().vec();
+        //auto deviceVol = _volume.device();
+        //auto dimsVol = _volume.sizes().vec();
+        //auto deviceGrid = trans_grid.device();
+
+        //auto dimsGrid = trans_grid.sizes().vec();
         auto proj = gridSampleAndProject(_volume, trans_grid);
-        auto dimsAngles = angles.sizes().vec();
-        auto size = angles.size(0) * _oversampledBoxsize * _oversampledBoxsize;
-        float * projFlat = new float[angles.size(0) * _oversampledBoxsize * _oversampledBoxsize];
-        auto projFlatDims = proj.sizes().vec();
-        auto err = cudaPeekAtLastError();
+        //auto projDev = proj.device();
+        //auto dimsAngles = angles.sizes().vec();
+        //auto size = angles.size(0) * _oversampledBoxsize * _oversampledBoxsize;
+        //float * projFlat = new float[angles.size(0) * _oversampledBoxsize * _oversampledBoxsize];
+        //auto projFlatDims = proj.sizes().vec();
+        //auto err = cudaPeekAtLastError();
         //cudaDeviceSynchronize();
-        cudaMemcpy(projFlat, proj.data_ptr(), angles.size(0) * _oversampledBoxsize * _oversampledBoxsize * sizeof(float), cudaMemcpyDeviceToHost);
+        //cudaMemcpy(projFlat, proj.data_ptr(), angles.size(0) * _oversampledBoxsize * _oversampledBoxsize * sizeof(float), cudaMemcpyDeviceToHost);
+        //auto err2 = cudaPeekAtLastError();
         //cudaDeviceSynchronize();
         if (_oversampledBoxsize != _boxsize)
             proj = scaleVolume(proj, 2, _boxsize, _boxsize, -1);
+        //auto err3 = cudaPeekAtLastError();
         return proj;
     }
 

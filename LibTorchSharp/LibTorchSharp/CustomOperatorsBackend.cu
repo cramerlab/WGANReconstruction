@@ -1417,7 +1417,7 @@ namespace at {
                         }
                         else {
                             grid_sampler_and_project_3d_kernel<scalar_t>
-                                << <1, 1, 0, at::cuda::getCurrentCUDAStream() >> > (
+                                << <MY_CUDA_GET_BLOCKS(count), MY_CUDA_MAX_THREADS, 0, at::cuda::getCurrentCUDAStream() >> > (
                                     count,
                                     getTensorInfo<scalar_t, int64_t>(input),
                                     getTensorInfo<scalar_t, int64_t>(grid),
