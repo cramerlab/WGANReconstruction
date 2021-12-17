@@ -695,9 +695,11 @@ namespace ParticleWGANDev
 
                 if ((IterationsDone * BatchSize * (DiscIters + 1)) > (currentEpoch + 1) * numParticles)
                 {
+                    if (currentEpoch %10 ==0 || currentEpoch==numEpochs-1)
+                        ShouldSaveModel = true;
                     currentEpoch += 1;
                     Dispatcher.Invoke(() => LearningRate = LearningRate * reduction);
-                    ShouldSaveModel = true;
+                    
                 }
                 if (currentEpoch >= numEpochs)
                 {
