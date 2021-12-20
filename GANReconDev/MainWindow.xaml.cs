@@ -91,7 +91,7 @@ namespace ParticleWGANDev
         private string OutDirectory = @"D:\GAN_recon_polcompl\";
         private string DirectoryReal = "particles";
         private string DirectoryFake = "sim";
-        const int numEpochs = 1;
+        const int numEpochs = 2;
         const int Dim = 64;
         const int Dim_zoom = 128;
         decimal reduction = 0.9M;
@@ -103,14 +103,14 @@ namespace ParticleWGANDev
         */
         private double LowPass = 1.0;
 
-        private int BatchSize = 64;
+        private int BatchSize = 48;
         float Lambda = 0.01f;
         int DiscIters = 8;
         bool TrainGen = true;
 
         int NThreads = 3;
-        int PreProcessingDevice = 1;
-        int ProcessingDevice = 0;
+        int PreProcessingDevice = 0;
+        int ProcessingDevice = 1;
         string logFileName = "log.txt";
         public MainWindow()
         {
@@ -143,7 +143,7 @@ namespace ParticleWGANDev
             Torch.SetSeed(seed);
             //ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 32, new[] { 1 }, BatchSize);
             //Image refVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
-            ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), new[] { ProcessingDevice }, BatchSize);
+            ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), new[] { 1,2,3 }, BatchSize);
             TrainModel.SigmaShift = sigmaShiftRel;
             //TrainModel.Load(@"D:\GAN_recon_polcompl\ParticleWGAN_SN_20210910_161349.pt");
             WriteToLog("Done. (" + GPU.GetFreeMemory(ProcessingDevice) + " MB free)");
@@ -662,39 +662,6 @@ namespace ParticleWGANDev
 
                     //PredictionGen.WriteMRC("d_gen.mrc", true);
 
-                    if (ShouldSaveModel)
-                    {
-                        ShouldSaveModel = false;
-                        string datestring = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                        TrainModel.Save(OutDirectory + @"ParticleWGAN_SN_" + datestring + ".pt");
-                        var imageVolume = TrainModel.getVolume();
-                        imageVolume.WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + ".mrc", true);
-                        Image resized;
-                        if (Dim != Dim_zoom)
-                            resized = imageVolume.AsScaled(new int3(Dim_zoom));
-                        else
-                            resized = imageVolume;
-
-                        if (Dim_zoom != DimRaw)
-                            resized = resized.AsPadded(new int3(DimRaw));
-                        resized.WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + "_resized.mrc", true);
-
-                        resized.MaskSpherically(Dim / 2, Dim / 8, false);
-                        resized.WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + "_resized_masked.mrc", true);
-                        imageVolume.Dispose();
-                        Thread.Sleep(10000);
-
-                        Dispatcher.Invoke(() => ButtonSave.IsEnabled = true);
-
-                        if (ShouldSaveRecs)
-                        {
-                            Image.Stack(ImagesReal).WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + "_real.mrc", true);
-                            Image.Stack(ImagesCTF).WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + "_ctf.mrc", true);
-                            PredictionGen.WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + "_prediction.mrc", true);
-                            PredictionGenNoisy.WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + "_predictionNoisy.mrc", true);
-                        }
-
-                    }
 
                     AllLossesReal.Clear();
                     AllLossesFake.Clear();
@@ -716,6 +683,40 @@ namespace ParticleWGANDev
                     currentEpoch += 1;
                     Dispatcher.Invoke(() => LearningRate = LearningRate * reduction);
                     
+                }
+
+                if (ShouldSaveModel)
+                {
+                    ShouldSaveModel = false;
+                    string datestring = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                    TrainModel.Save(OutDirectory + @"ParticleWGAN_SN_" + datestring + ".pt");
+                    var imageVolume = TrainModel.getVolume();
+                    imageVolume.WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + ".mrc", true);
+                    Image resized;
+                    if (Dim != Dim_zoom)
+                        resized = imageVolume.AsScaled(new int3(Dim_zoom));
+                    else
+                        resized = imageVolume;
+
+                    if (Dim_zoom != DimRaw)
+                        resized = resized.AsPadded(new int3(DimRaw));
+                    resized.WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + "_resized.mrc", true);
+
+                    resized.MaskSpherically(Dim / 2, Dim / 8, false);
+                    resized.WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + "_resized_masked.mrc", true);
+                    imageVolume.Dispose();
+                    Thread.Sleep(10000);
+
+                    Dispatcher.Invoke(() => ButtonSave.IsEnabled = true);
+
+                    if (ShouldSaveRecs)
+                    {
+                        Image.Stack(ImagesReal).WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + "_real.mrc", true);
+                        Image.Stack(ImagesCTF).WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + "_ctf.mrc", true);
+                        PredictionGen.WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + "_prediction.mrc", true);
+                        PredictionGenNoisy.WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + "_predictionNoisy.mrc", true);
+                    }
+
                 }
                 if (currentEpoch >= numEpochs)
                 {
