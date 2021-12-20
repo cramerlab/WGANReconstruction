@@ -73,12 +73,25 @@ namespace ParticleWGANDev
         private bool ShouldSaveRecs = false;
         private bool ShouldTrainOnlyGen = false;
 
+        CancellationTokenSource cancellationTokenSourceWindow = new CancellationTokenSource();
+
+        struct ThreadArgs
+        {
+            public CancellationToken Token;
+            public int ThreadId;
+
+            public ThreadArgs(CancellationToken token, int threadId)
+            {
+                Token = token;
+                ThreadId = threadId;
+            }
+        }
 
         private string WorkingDirectory = @"D:\GAN_recon_polcompl\";
         private string OutDirectory = @"D:\GAN_recon_polcompl\";
         private string DirectoryReal = "particles";
         private string DirectoryFake = "sim";
-        const int numEpochs = 100;
+        const int numEpochs = 1;
         const int Dim = 64;
         const int Dim_zoom = 128;
         decimal reduction = 0.9M;
@@ -90,24 +103,24 @@ namespace ParticleWGANDev
         */
         private double LowPass = 1.0;
 
-        private int BatchSize = 16;
+        private int BatchSize = 64;
         float Lambda = 0.01f;
         int DiscIters = 8;
         bool TrainGen = true;
 
-        int NThreads = 1;
-        int PreProcessingDevice = 0;
-        int ProcessingDevice = 1;
+        int NThreads = 3;
+        int PreProcessingDevice = 1;
+        int ProcessingDevice = 0;
         string logFileName = "log.txt";
         public MainWindow()
         {
             InitializeComponent();
-            this.BatchSize = MainWindow.settings.BatchSize;
-            this.LearningRate = MainWindow.settings.LearningRate;
-            this.reduction = MainWindow.settings.Reduction;
-            this.Lambda = MainWindow.settings.Lambda;
-            this.DiscIters = MainWindow.settings.DiscIters;
-            
+            BatchSize = settings.BatchSize;
+            LearningRate = settings.LearningRate;
+            reduction = settings.Reduction;
+            Lambda = settings.Lambda;
+            DiscIters = settings.DiscIters;
+
             this.OutDirectory = $@"{MainWindow.settings.OutDirectory}\";
             if (!(Directory.Exists(OutDirectory)))
             {
@@ -115,7 +128,13 @@ namespace ParticleWGANDev
             }
             this.logFileName = $@"{MainWindow.settings.OutDirectory}\{MainWindow.settings.LogFileName}";
             SliderLearningRate.DataContext = this;
-            Task.Run(doTraining);
+            ButtonStartParticle.IsEnabled = false;
+            Task.Run(doTraining, cancellationTokenSourceWindow.Token);
+        }
+        private void Close()
+        {
+            cancellationTokenSourceWindow.Cancel();
+            Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
         }
 
         private void doTraining() {
@@ -194,6 +213,7 @@ namespace ParticleWGANDev
             int currentEpoch = 0;
             ParameterizedThreadStart ReloadLambda = (par) =>
             {
+                ThreadArgs args = (ThreadArgs)par;
                 GPU.SetDevice(PreProcessingDevice);
                 Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "Refine3D_CryoSparcSelected_run_class001.mrc"));
                 if (Dim_zoom != DimRaw)
@@ -206,9 +226,9 @@ namespace ParticleWGANDev
                 //var TGenerator = TorchSharp.NN.Modules.ReconstructionWGANGenerator(TensorRefVolume, Dim_volume);
                 var TensorAngles = Float32Tensor.Zeros(new long[] { BatchSize, 3 }, DeviceType.CUDA, PreProcessingDevice);
 
-                Random ReloadRand = new Random((int)par);
-                Random NoiseRand = new Random((int)par);
-                Random ShiftRand = new Random((int)par);
+                Random ReloadRand = new Random(args.ThreadId);
+                Random NoiseRand = new Random(args.ThreadId);
+                Random ShiftRand = new Random(args.ThreadId);
                 bool OwnBatchUsed = true;
 
 
@@ -294,7 +314,7 @@ namespace ParticleWGANDev
                     PlanBack = GPU.CreateIFFTPlan(new int3(Dim, Dim, 1), (uint)BatchSize);
                 }
 
-                while (true)
+                while (!args.Token.IsCancellationRequested)
                 {
                     // If this thread succeeded at pushing its previously loaded batch to processing
                     if (OwnBatchUsed)
@@ -336,7 +356,7 @@ namespace ParticleWGANDev
                                 return new float3(x, y, 0);
                             }, projected.Dims.Z);
 
-                            //projected.ShiftSlices(shiftsPix);
+                            projected.ShiftSlices(shiftsPix);
 
                             float3[] shiftsRel = Helper.ArrayOfFunction(i => shiftsPix[i] * 1.0f / (Dim_volume / 2), shiftsPix.Length);
 
@@ -384,17 +404,13 @@ namespace ParticleWGANDev
                                 projected = fft.AsIFFT(false, 0, true);
                                 fft.Dispose();
                             }
-
-                            projected.TransformValues(val =>
+                            using (TorchTensor noise = Float32Tensor.RandomN(new long[] { projected.Dims.Z, projected.Dims.Y, projected.Dims.X }, DeviceType.CUDA, PreProcessingDevice))
                             {
-                                //https://stackoverflow.com/a/218600/5012099
-                                double u1 = 1.0 - NoiseRand.NextDouble(); //uniform(0,1] random doubles
-                                double u2 = 1.0 - NoiseRand.NextDouble();
-                                double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) *
-                                             Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
-                                double randNormal = 0 + 1.0 * randStdNormal;
-                                return (float)(val + randNormal);
-                            });
+                                Image imNoise = new Image(projected.Dims);
+                                GPU.CopyDeviceToDevice(noise.DataPtr(), imNoise.GetDevice(Intent.Write), imNoise.ElementsReal);
+                                projected.Add(imNoise);
+                                imNoise.Dispose();
+                            }
                             Image projectedScaled = projected.AsScaled(new int2(Dim));
                             projectedScaled.Bandpass(0, 1.0f, false, 0.05f);
                             projected.Dispose();
@@ -425,10 +441,10 @@ namespace ParticleWGANDev
             };
 
             //ReloadLambda(0);
-
+            CancellationTokenSource ThreadSource = new();
             Thread[] ReloadThreads = Helper.ArrayOfFunction(i => new Thread(ReloadLambda), NThreads);
             for (int i = 0; i < NThreads; i++)
-                ReloadThreads[i].Start(i);
+                ReloadThreads[i].Start(new ThreadArgs(ThreadSource.Token, i));
 
             GPU.SetDevice(ProcessingDevice);
 
@@ -589,7 +605,7 @@ namespace ParticleWGANDev
                         predictionGenCopy.Dispose();
                         int waveNumber = 0;
                         for (waveNumber = 0; waveNumber < FRC.Length && FRC[waveNumber] >= 0.5; waveNumber++) ;
-                        FRCResolution = Dim * 6 / (waveNumber - 1);
+                        FRCResolution = waveNumber > 1 ? Dim * 6 / (waveNumber - 1) : (float)(Dim * 6);
                         GPU.CheckGPUExceptions();
                     }
                     WriteToLog($"{MathHelper.Mean(AllLossesReal):#.##E+00}, {MathHelper.Mean(AllLossesFake):#.##E+00}, {MathHelper.Max(AllGradNormDisc):#.##E+00}, {MathHelper.Max(AllGradNormGen):#.##E+00}, {FRCResolution}");
@@ -703,17 +719,33 @@ namespace ParticleWGANDev
                 }
                 if (currentEpoch >= numEpochs)
                 {
-                    break;
+                    //Tell Threads to exit
+                    ThreadSource.Cancel();
+                    //Release wait block, so threads can actually exit
+                    ReloadBlock.Release();
+                    for (int i = 0; i < NThreads; i++)
+                    {
+                        //Wait for all threads
+                        ReloadThreads[i].Join();
+                    }
+                    //kill this application
+                    Application.Current.Dispatcher.Invoke(() => this.Close());
+                    return;
                 }
                 ReloadBlock.Release();
             }
         }
-    
 
+        protected override void OnClosed(EventArgs e)
+        {
+            base.OnClosed(e);
+
+            Application.Current.Shutdown();
+        }
         private void ButtonStartParticle_OnClick(object sender, RoutedEventArgs e)
         {
             ButtonStartParticle.IsEnabled = false;
-
+            doTraining();
             Task.Run(doTraining);
         }
 
