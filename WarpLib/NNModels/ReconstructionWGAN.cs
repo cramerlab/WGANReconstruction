@@ -53,7 +53,7 @@ namespace Warp.NNModels
         private double sigmaShift = 0;
 
         private bool IsDisposed = false;
-        private bool doShift = true;
+        private bool doShift = false;
 
         private double GenVolumeBoost = 10;
         private double GenBoost = 1;
@@ -77,7 +77,7 @@ namespace Warp.NNModels
                 throw new Exception("Batch size must be divisible by the number of devices.");
 
             BoxDimensions = boxDimensions;
-            OversampledBoxDimensions = boxDimensions*2;
+            OversampledBoxDimensions = boxDimensions*4;//boxDimensions*2;
 
             Generators = new ReconstructionWGANGenerator[NDevices];
             Discriminators = new ReconstructionWGANDiscriminator[NDevices];
@@ -362,7 +362,7 @@ namespace Warp.NNModels
                     using (TorchTensor PredictionDetached = PredictionNoisyMasked.Detach())
                     using (TorchTensor LossFake = IsFakeReal.Mean())
                     {
-                        {
+                        /*{
                             Image imPredictionNoisyNormalized = new Image(new int3(BoxDimensions.X, BoxDimensions.Y, DeviceBatch));
                             GPU.CopyDeviceToDevice(PredictionNoisyNormalized.DataPtr(), imPredictionNoisyNormalized.GetDevice(Intent.Write), imPredictionNoisyNormalized.ElementsReal);
                             imPredictionNoisyNormalized.WriteMRC("imPredictionNoisyNormalized.mrc", true);
@@ -375,7 +375,7 @@ namespace Warp.NNModels
                             GPU.CopyDeviceToDevice(TensorMask[i].DataPtr(), imTensorMask.GetDevice(Intent.Write), imTensorMask.ElementsReal);
                             imTensorMask.WriteMRC("imTensorMask.mrc", true);
                             imTensorMask.Dispose();
-                        }
+                        }*/
                         GPU.CopyDeviceToDevice(PredictionNoisyMasked.DataPtr(),
                                                ResultPredicted.GetDeviceSlice(i * DeviceBatch, Intent.Write),
                                                DeviceBatch * (int)BoxDimensions.Elements());
