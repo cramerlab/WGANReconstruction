@@ -77,7 +77,7 @@ namespace Warp.NNModels
                 throw new Exception("Batch size must be divisible by the number of devices.");
 
             BoxDimensions = boxDimensions;
-            OversampledBoxDimensions = boxDimensions*4;//boxDimensions*2;
+            OversampledBoxDimensions = new(128);// boxDimensions*4;//boxDimensions*2;
 
             Generators = new ReconstructionWGANGenerator[NDevices];
             Discriminators = new ReconstructionWGANDiscriminator[NDevices];

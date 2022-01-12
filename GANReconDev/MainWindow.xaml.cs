@@ -128,7 +128,7 @@ namespace ParticleWGANDev
             }
             
             this.logFileName = $@"{MainWindow.settings.OutDirectory}\{MainWindow.settings.LogFileName}";
-            doTraining();
+            //doTraining();
             SliderLearningRate.DataContext = this;
             ButtonStartParticle.IsEnabled = false;
             Task.Run(doTraining, cancellationTokenSourceWindow.Token);
@@ -145,7 +145,7 @@ namespace ParticleWGANDev
             Torch.SetSeed(seed);
             //ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 32, new[] { 1 }, BatchSize);
             //Image refVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
-            ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), new[] { ProcessingDevice }, BatchSize);
+            ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), new[] { 1,2, 3 }, BatchSize);
             TrainModel.SigmaShift = sigmaShiftRel;
             //TrainModel.Load(@"D:\GAN_recon_polcompl\ParticleWGAN_SN_20210910_161349.pt");
             WriteToLog("Done. (" + GPU.GetFreeMemory(ProcessingDevice) + " MB free)");
@@ -227,7 +227,7 @@ namespace ParticleWGANDev
                 var TProj = new Projector(TrefVolume, 2);
                 var TensorRefVolume = Float32Tensor.Empty(new long[] { 1, Dim_volume, Dim_volume, Dim_volume }, DeviceType.CUDA, PreProcessingDevice);
                 GPU.CopyDeviceToDevice(TrefVolume.GetDevice(Intent.Read), TensorRefVolume.DataPtr(), TrefVolume.ElementsReal);
-                //var TGenerator = TorchSharp.NN.Modules.ReconstructionWGANGenerator(TensorRefVolume, Dim_volume);
+                var TGenerator = TorchSharp.NN.Modules.ReconstructionWGANGenerator(TensorRefVolume, Dim_volume);
                 var TensorAngles = Float32Tensor.Zeros(new long[] { BatchSize, 3 }, DeviceType.CUDA, PreProcessingDevice);
 
                 Random ReloadRand = new Random(args.ThreadId);
@@ -330,13 +330,14 @@ namespace ParticleWGANDev
 
                             // Read, and copy or rescale real and fake images from prepared stacks
 
-                            float3[] theseAngles = Helper.IndexedSubset(RandomParticleAngles, AngleIds);
-                            //float3[] theseAngles = Helper.ArrayOfFunction(i => new float3(0), BatchSize);
+                            //float3[] theseAngles = Helper.IndexedSubset(RandomParticleAngles, AngleIds);
+                            float3[] theseAngles = Helper.ArrayOfFunction(i => new float3(0), BatchSize);
                             TImagesAngles[iterTrain] = Helper.ToInterleaved(theseAngles);
                             GPU.CopyHostToDevice(TImagesAngles[iterTrain], TensorAngles.DataPtr(), TImagesAngles[iterTrain].Length);
 
                             Image projected = TProj.ProjectToRealspace(new int2(Dim_volume), theseAngles);
-                            /*using (TorchTensor tensorproj = TGenerator.Forward(TensorAngles, false))
+                            /*Image projected = new Image(new int3(Dim,Dim, theseAngles.Length));
+                            using (TorchTensor tensorproj = TGenerator.Forward(TensorAngles, false))
                             {
                                 GPU.CopyDeviceToDevice(tensorproj.DataPtr(), projected.GetDevice(Intent.Write), projected.ElementsReal);
                             }*/
@@ -381,7 +382,9 @@ namespace ParticleWGANDev
                               Helper.IndexedSubset(AllParticleCTF, SubsetIDs).Select(c => c.ToStruct()).ToArray(),
                               false,
                               (uint)BatchSize);
-
+                            
+                            //TImagesCTFFull[iterTrain].Fill(1);
+                            //TImagesCTFScaled[iterTrain].Fill(1);
 
                             {
                                 Image thisCTFSign = TImagesCTFFull[iterTrain].GetCopy();
@@ -412,7 +415,7 @@ namespace ParticleWGANDev
                             {
                                 Image imNoise = new Image(projected.Dims);
                                 GPU.CopyDeviceToDevice(noise.DataPtr(), imNoise.GetDevice(Intent.Write), imNoise.ElementsReal);
-                                //imNoise.Multiply(0.9f);
+                                //imNoise.Multiply(0.5f);
                                 projected.Add(imNoise);
                                 imNoise.Dispose();
                             }
@@ -566,13 +569,13 @@ namespace ParticleWGANDev
                 if (IterationsDone % 10 == 0)
                 {
                     float FRCResolution = 0.0f;
-                    /*{
+                    {
                         Image predictionGenCopy = PredictionGen.AsSliceXY(0);
                         GPU.CheckGPUExceptions();
                         predictionGenCopy.MaskSpherically(Dim / 2, Dim / 8, false);
                         predictionGenCopy.Normalize();
                         GPU.CheckGPUExceptions();
-                        predictionGenCopy.WriteMRC("PredictionGen.mrc", true);
+                        predictionGenCopy.WriteMRC($@"{OutDirectory}\PredictionGen_{IterationsDone}.mrc", true);
                         
                         Image PredictionGenFT = predictionGenCopy.AsFFT();
                         GPU.CheckGPUExceptions();
@@ -615,7 +618,7 @@ namespace ParticleWGANDev
                         predictionGenCopy.Dispose();
                         PredictionGenFT.Dispose();
                         CleanProjectionsFT.Dispose();
-                    }*/
+                    }
                     WriteToLog($"{MathHelper.Mean(AllLossesReal):#.##E+00}, {MathHelper.Mean(AllLossesFake):#.##E+00}, {MathHelper.Max(AllGradNormDisc):#.##E+00}, {MathHelper.Max(AllGradNormGen):#.##E+00}, {FRCResolution}");
 
                     LossPointsReal.Add(new ObservablePoint(IterationsDone, -1 * MathHelper.Mean(AllLossesReal)));

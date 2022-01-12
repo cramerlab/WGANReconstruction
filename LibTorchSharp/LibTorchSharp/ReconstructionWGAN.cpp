@@ -173,7 +173,7 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
     {
         _boxsize = boxsize;
         _oversamplimg = 4;
-        _oversampledBoxsize = _boxsize*_oversamplimg;
+        _oversampledBoxsize = 128;
         
         int currentchannels = 4;
         int currentsize = _boxsize;

@@ -2,7 +2,7 @@
   "profiles": {
     "GANReconDev": {
       "commandName": "Project",
-      "commandLineArgs": "16 0.0001 0.99 0.1 5 log.txt D:\\GAN_recon_polcompl\\MulticryoGAN\\",
+      "commandLineArgs": "24 0.00001 0.99 0.6 5 log.txt D:\\GAN_recon_polcompl\\MulticryoGAN\\",
       "nativeDebugging": true
     }
   }
