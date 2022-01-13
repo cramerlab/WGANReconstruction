@@ -61,7 +61,7 @@ namespace Warp.NNModels
         private double discriminator_grad_clip_val = 1e8f;
         private double lambdaOutsideMask = 10;
 
-        private bool doNormalizeInput = true;
+        private bool doNormalizeInput = false;
         private bool doMaskProjections = true;
 
         public double SigmaShift { get => sigmaShift; set => sigmaShift = value; }
@@ -336,7 +336,7 @@ namespace Warp.NNModels
                 using (TorchTensor TrueImageMean = doNormalizeInput ? TensorTrueImages[i].Mean(new long[] { 2, 3 }, true):null)
                 using (TorchTensor TrueImageStd = doNormalizeInput ? TensorTrueImages[i].Std(new long[] { 2, 3 }, true, true):null)
                 using (TorchTensor TrueImageNormalized = doNormalizeInput?(TensorTrueImages[i] - TrueImageMean) / (TrueImageStd + 1e-4):null)
-                using (TorchTensor TrueNormalizedMasked = doMaskProjections?TrueImageNormalized.Mul(TensorMask[i]): TrueImageNormalized)
+                using (TorchTensor TrueNormalizedMasked = doMaskProjections ? (doNormalizeInput ? TrueImageNormalized.Mul(TensorMask[i]) : TensorTrueImages[i].Mul(TensorMask[i])) : (doNormalizeInput ? TrueImageNormalized : null))
                 using (TorchTensor TrueMasked = doNormalizeInput ? null : TensorTrueImages[i].Mul(TensorMask[i]))
                 using (TorchTensor IsTrueReal = Discriminators[i].Forward(doNormalizeInput? TrueNormalizedMasked:TrueMasked))
                 using (TorchTensor IsTrueRealNeg = IsTrueReal * (-1))
