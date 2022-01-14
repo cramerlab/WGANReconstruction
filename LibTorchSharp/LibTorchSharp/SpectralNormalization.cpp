@@ -19,7 +19,14 @@ torch::Tensor SpNormConv2dImpl::forward(torch::Tensor input)
 
 		params["convolution.weight"].set_data(newWeight);
 
-		return conv->forward(input);
+		auto inpDev = input.device();
+		auto oldWeightDev = oldWeight.device();
+		auto uDev = u.device();
+		auto vDev = v.device();
+		auto newWeightDev = newWeight.device();
+		auto output = conv->forward(input);
+
+		return output;
 }
 
 
