@@ -146,11 +146,11 @@ namespace Warp.NNModels
 
             
             OptimizerGenVolume = Optimizer.Adam(Generators[0].GetParameters().Take(1), 0.01, 1e-8);
-            OptimizerGenVolume.SetBetasAdam(0.5, 0.9);
+            //OptimizerGenVolume.SetBetasAdam(0.5, 0.9);
             OptimizerGen = Optimizer.Adam(Generators[0].GetParameters().Skip(1), 0.01, 1e-8);
-            OptimizerGen.SetBetasAdam(0.5, 0.9);
+            //OptimizerGen.SetBetasAdam(0.5, 0.9);
             OptimizerDisc = Optimizer.Adam(Discriminators[0].GetParameters(), 0.01, 1e-8);
-            OptimizerDisc.SetBetasAdam(0.5, 0.9);
+            //OptimizerDisc.SetBetasAdam(0.5, 0.9);
             
             //OptimizerGenVolume = Optimizer.RMSprop(Generators[0].GetParameters().Take(1), 0.01, 1e-8);
             //OptimizerGen = Optimizer.RMSprop(Generators[0].GetParameters().Skip(1), 0.01, 1e-8);
@@ -292,7 +292,7 @@ namespace Warp.NNModels
 
             
             GatherGrads();
-            gradNorm = Generators[0].Clip_Gradients(generator_grad_clip_val);
+            gradNorm = Generators[0].Clip_Gradients(1e3);
             OptimizerGen.Step();
             OptimizerGenVolume.Step();
             prediction = ResultPredicted;
@@ -385,19 +385,22 @@ namespace Warp.NNModels
                             LossWasserstein = LossWasserstein + ResultLossDiscFake[0];
                             ResultLoss[0] = LossWasserstein;
                         }
-
-                        using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(doNormalizeInput? TrueNormalizedMasked:TrueMasked, PredictionNoisyMasked, penaltyLambda))
+                        LossReal.Backward();
+                        LossFake.Backward();
+                        if (penaltyLambda > 0.0)
                         {
-                            LossReal.Backward();
-                            LossFake.Backward();
-                            Penalty.Backward();
+                            using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(doNormalizeInput ? TrueNormalizedMasked : TrueMasked, PredictionNoisyMasked, penaltyLambda))
+                            {
+                                
+                                Penalty.Backward();
+                            }
                         }
                     }
                 }
             }, null);
 
             GatherGrads();
-            gradNorm = Discriminators[0].Clip_Gradients(discriminator_grad_clip_val);
+            gradNorm = Discriminators[0].Clip_Gradients(1.0);
             OptimizerDisc.Step();
 
             prediction = ResultPredicted;
