@@ -62,7 +62,7 @@ namespace Warp.NNModels
         private double lambdaOutsideMask = 10;
 
         private bool doNormalizeInput = false;
-        private bool doMaskProjections = true;
+        private bool doMaskProjections = false;
 
         public double SigmaShift { get => sigmaShift; set => sigmaShift = value; }
 

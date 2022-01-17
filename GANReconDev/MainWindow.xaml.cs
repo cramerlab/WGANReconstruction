@@ -209,7 +209,7 @@ namespace ParticleWGANDev
                 var TProj = new Projector(TrefVolume, 2);
                 cleanProjection = TProj.ProjectToRealspace(new int2(Dim), new float3[] { new float3(0) });
                 cleanProjection.MaskSpherically(Dim / 2, Dim / 8, false);
-                cleanProjection.Normalize();
+                //cleanProjection.Normalize();
                 cleanProjection.WriteMRC("cleanProjection.mrc", true);
                 cleanProjection.FreeDevice();
             }
@@ -242,16 +242,17 @@ namespace ParticleWGANDev
                 Image[] TImagesReal = Helper.ArrayOfFunction(i => new Image(new int3(Dim, Dim, BatchSize)), DiscIters + 1);
                 Image[] TImagesCTFFull = Helper.ArrayOfFunction(i => { Image im = new Image(new int3(Dim_volume, Dim_volume, BatchSize), true); im.Fill(1); return im; }, DiscIters + 1);
                 Image[] TImagesCTFScaled = Helper.ArrayOfFunction(i => { Image im = new Image(new int3(Dim, Dim, BatchSize), true); im.Fill(1); return im; }, DiscIters + 1);
-                Image CTFMaskFull = new Image(new int3(Dim_volume, Dim_volume, BatchSize), true);
-                CTFMaskFull.Fill(1);
-                Image CTFMaskScaled = new Image(new int3(Dim, Dim, BatchSize), true);
-                CTFMaskScaled.Fill(1);
+                
+                
                 float[][] TImagesAngles = Helper.ArrayOfFunction(i => new float[BatchSize * 3], DiscIters + 1);
                 Image CTFCoordsFull = CTF.GetCTFCoords(Dim_volume, Dim_volume);
                 Image CTFCoordsScaled = CTF.GetCTFCoords(Dim, Dim_zoom);
                 float2[][] scaledCoords = CTFCoordsScaled.GetHostComplexCopy();
                 float2[][] FullCoords = CTFCoordsFull.GetHostComplexCopy();
 
+                /*
+                Image CTFMaskFull = new Image(new int3(Dim_volume, Dim_volume, BatchSize), true);
+                CTFMaskFull.Fill(1);
                 CTFMaskFull.TransformValues((x, y, z, val) =>
                 {
                     float nyquistsoftedge = 0.05f;
@@ -280,7 +281,8 @@ namespace ParticleWGANDev
 
                     return val * filter;
                 });
-
+                Image CTFMaskScaled = new Image(new int3(Dim, Dim, BatchSize), true);
+                CTFMaskScaled.Fill(1);
                 CTFMaskScaled.TransformValues((x, y, z, val) =>
                 {
                     float nyquistsoftedge = 0.05f;
@@ -309,7 +311,7 @@ namespace ParticleWGANDev
 
                     return val * filter;
                 });
-
+                */
 
                 int PlanForw = 0, PlanBack = 0;
                 if (DimRaw != Dim)
@@ -396,17 +398,18 @@ namespace ParticleWGANDev
                                 thisCTFSign.Sign();
                                 TImagesCTFFull[iterTrain].Multiply(thisCTFSign);
                                 //TImagesCTFFull[iterTrain].WriteMRC($@"{OutDirectory}\Thread_{par}_CTFFull.mrc", true);
-                                TImagesCTFFull[iterTrain].Multiply(CTFMaskFull);
-                                //TImagesCTFFull[iterTrain].WriteMRC($@"{OutDirectory}\Thread_{par}_CTFFullMasked.mrc", true);
+                                //TImagesCTFFull[iterTrain].Multiply(CTFMaskFull);
+                                TImagesCTFFull[iterTrain].WriteMRC($@"{OutDirectory}\Thread_{par}_CTFFullMasked.mrc", true);
                                 thisCTFSign.Dispose();
                             }
                             {
+                                TImagesCTFScaled[iterTrain].WriteMRC($@"{OutDirectory}\Thread_{par}_CTFScaled.mrc", true);
                                 Image thisCTFSign = TImagesCTFScaled[iterTrain].GetCopy();
                                 thisCTFSign.Sign();
                                 TImagesCTFScaled[iterTrain].Multiply(thisCTFSign);
                                 //TImagesCTFScaled[iterTrain].WriteMRC($@"{OutDirectory}\Thread_{par}_CTFScaled.mrc", true);
-                                TImagesCTFScaled[iterTrain].Multiply(CTFMaskScaled);
-                                //TImagesCTFScaled[iterTrain].WriteMRC($@"{OutDirectory}\Thread_{par}_CTFScaledMasked.mrc", true);
+                                //TImagesCTFScaled[iterTrain].Multiply(CTFMaskScaled);
+                                TImagesCTFScaled[iterTrain].WriteMRC($@"{OutDirectory}\Thread_{par}_CTFScaledMasked.mrc", true);
                                 thisCTFSign.Dispose();
                             }
                             {
@@ -425,7 +428,7 @@ namespace ParticleWGANDev
                                 imNoise.Dispose();
                             }
                             Image projectedScaled = projected.AsScaled(new int2(Dim));
-                            projectedScaled.Bandpass(0, 1.0f, false, 0.05f);
+                            //projectedScaled.Bandpass(0, 1.0f, false, 0.05f);
                             projected.Dispose();
                             GPU.CopyDeviceToDevice(projectedScaled.GetDevice(Intent.Read), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
                             projectedScaled.Dispose();
@@ -574,11 +577,12 @@ namespace ParticleWGANDev
                 if (IterationsDone % 10 == 0)
                 {
                     float FRCResolution = 0.0f;
-                    /*{
+                    /*
+                    {
                         Image predictionGenCopy = PredictionGen.AsSliceXY(0);
                         GPU.CheckGPUExceptions();
                         predictionGenCopy.MaskSpherically(Dim / 2, Dim / 8, false);
-                        predictionGenCopy.Normalize();
+                        //predictionGenCopy.Normalize();
                         GPU.CheckGPUExceptions();
                         predictionGenCopy.WriteMRC($@"{OutDirectory}\PredictionGen_{IterationsDone}.mrc", true);
                         
@@ -623,7 +627,8 @@ namespace ParticleWGANDev
                         predictionGenCopy.Dispose();
                         PredictionGenFT.Dispose();
                         CleanProjectionsFT.Dispose();
-                    }*/
+                    }
+                    */
                     WriteToLog($"{MathHelper.Mean(AllLossesReal):#.##E+00}, {MathHelper.Mean(AllLossesFake):#.##E+00}, {MathHelper.Max(AllGradNormDisc):#.##E+00}, {MathHelper.Max(AllGradNormGen):#.##E+00}, {FRCResolution}");
 
                     LossPointsReal.Add(new ObservablePoint(IterationsDone, -1 * MathHelper.Mean(AllLossesReal)));
