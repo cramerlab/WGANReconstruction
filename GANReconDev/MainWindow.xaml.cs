@@ -87,13 +87,13 @@ namespace ParticleWGANDev
             }
         }
 
-        private string WorkingDirectory = @"D:\GAN_recon_rdrp\";
-        private string OutDirectory = @"D:\GAN_recon_rdrp\";
+        private string WorkingDirectory = @"D:\GAN_recon_polcompl\";
+        private string OutDirectory = @"D:\GAN_recon_polcompl\";
         private string DirectoryReal = "particles";
         private string DirectoryFake = "sim";
-        const int numEpochs = 20;
-        const int Dim = 48;
-        const int Dim_zoom = 240;
+        const int numEpochs = 100;
+        const int Dim = 64;
+        const int Dim_zoom = 128;
         decimal reduction = 0.9M;
         const double sigmaShiftPix = 0.5;
         const double sigmaShiftRel = sigmaShiftPix / (Dim_zoom / 2);
@@ -159,7 +159,7 @@ namespace ParticleWGANDev
             Semaphore ReloadBlock = new Semaphore(1, 1);
             bool HasBeenProcessed = true;
 
-            Star TableIn = new Star(Path.Combine(WorkingDirectory, "particles_r2_head.star"));
+            Star TableIn = new Star(Path.Combine(WorkingDirectory, "cryosparc_P243_J525_003_particles.star"));
 
             Random rand = new Random(seed);
 
@@ -170,7 +170,7 @@ namespace ParticleWGANDev
             //int[] KeepRows = Helper.ArrayOfSequence(0, TableIn.RowCount, 1).Where(r => UniqueStackNames.Contains(ColumnStackNames[r])).ToArray();
             //TableIn = TableIn.CreateSubset(KeepRows);
 
-            int DimRaw = MapHeader.ReadFromFile(Path.Combine(WorkingDirectory, "run_ct7_class001.mrc")).Dimensions.X;
+            int DimRaw = MapHeader.ReadFromFile(Path.Combine(WorkingDirectory, "Refine3D_CryoSparcSelected_run_class001.mrc")).Dimensions.X;
 
             //int DimRaw = 240;
             //TableIn.AddColumn("rlnVoltage", "200.0");
@@ -199,7 +199,7 @@ namespace ParticleWGANDev
 
             float3[] RandomParticleAngles = Helper.GetHealpixAngles(3).Select(s => s * Helper.ToRad).ToArray();
 
-            Image cleanProjection;
+            /*Image cleanProjection;
             {
                 Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_ct7_class001.mrc"));
                 if (Dim_zoom != DimRaw)
@@ -212,14 +212,14 @@ namespace ParticleWGANDev
                 //cleanProjection.Normalize();
                 cleanProjection.WriteMRC("cleanProjection.mrc", true);
                 cleanProjection.FreeDevice();
-            }
+            }*/
             int numParticles = RandomParticleAngles.Length;
             int currentEpoch = 0;
             ParameterizedThreadStart ReloadLambda = (par) =>
             {
                 ThreadArgs args = (ThreadArgs)par;
                 GPU.SetDevice(PreProcessingDevice);
-                Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_ct7_class001.mrc"));
+                Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "Refine3D_CryoSparcSelected_run_class001.mrc"));
                 if (Dim_zoom != DimRaw)
                     TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - Dim_zoom) / 2), new int3(Dim_zoom));
                 int Dim_volume = 128;
@@ -234,9 +234,6 @@ namespace ParticleWGANDev
                 Random NoiseRand = new Random(args.ThreadId);
                 Random ShiftRand = new Random(args.ThreadId);
                 bool OwnBatchUsed = true;
-
-
-
                 Image LoadStack = new Image(new int3(DimRaw, DimRaw, BatchSize));
 
                 Image[] TImagesReal = Helper.ArrayOfFunction(i => new Image(new int3(Dim, Dim, BatchSize)), DiscIters + 1);
@@ -250,7 +247,7 @@ namespace ParticleWGANDev
                 float2[][] scaledCoords = CTFCoordsScaled.GetHostComplexCopy();
                 float2[][] FullCoords = CTFCoordsFull.GetHostComplexCopy();
 
-                /*
+                
                 Image CTFMaskFull = new Image(new int3(Dim_volume, Dim_volume, BatchSize), true);
                 CTFMaskFull.Fill(1);
                 CTFMaskFull.TransformValues((x, y, z, val) =>
@@ -311,7 +308,7 @@ namespace ParticleWGANDev
 
                     return val * filter;
                 });
-                */
+                
 
                 int PlanForw = 0, PlanBack = 0;
                 if (DimRaw != Dim)
@@ -333,10 +330,6 @@ namespace ParticleWGANDev
                             // Read, and copy or rescale real and fake images from prepared stacks
 
                             float3[] theseAngles = Helper.IndexedSubset(RandomParticleAngles, AngleIds);
-                            for (int idx = 0; idx < theseAngles.Length; idx++)
-                            {
-                                theseAngles[idx].Z = 0;
-                            }
                             
                             //float3[] theseAngles = Helper.ArrayOfFunction(i => new float3(0), BatchSize);
                             TImagesAngles[iterTrain] = Helper.ToInterleaved(theseAngles);
@@ -392,7 +385,7 @@ namespace ParticleWGANDev
 
                             //TImagesCTFFull[iterTrain].Fill(1);
                             //TImagesCTFScaled[iterTrain].Fill(1);
-                            projected.WriteMRC($@"{OutDirectory}\Thread_{args.ThreadId}_projected_clean.mrc", true);
+                            //projected.WriteMRC($@"{OutDirectory}\Thread_{args.ThreadId}_projected_clean.mrc", true);
                             {
                                 Image thisCTFSign = TImagesCTFFull[iterTrain].GetCopy();
                                 thisCTFSign.Sign();
@@ -403,7 +396,7 @@ namespace ParticleWGANDev
                                 thisCTFSign.Dispose();
                             }
                             {
-                                TImagesCTFScaled[iterTrain].WriteMRC($@"{OutDirectory}\Thread_{par}_CTFScaled.mrc", true);
+                                //TImagesCTFScaled[iterTrain].WriteMRC($@"{OutDirectory}\Thread_{par}_CTFScaled.mrc", true);
                                 Image thisCTFSign = TImagesCTFScaled[iterTrain].GetCopy();
                                 thisCTFSign.Sign();
                                 TImagesCTFScaled[iterTrain].Multiply(thisCTFSign);
@@ -419,19 +412,27 @@ namespace ParticleWGANDev
                                 projected = fft.AsIFFT(false, 0, true);
                                 fft.Dispose();
                             }
-                            /*using (TorchTensor noise = Float32Tensor.RandomN(new long[] { projected.Dims.Z, projected.Dims.Y, projected.Dims.X }, DeviceType.CUDA, PreProcessingDevice))
+                            /*
+                            using (TorchTensor noise = Float32Tensor.RandomN(new long[] { projected.Dims.Z, projected.Dims.Y, projected.Dims.X }, DeviceType.CUDA, PreProcessingDevice))
                             {
                                 Image imNoise = new Image(projected.Dims);
                                 GPU.CopyDeviceToDevice(noise.DataPtr(), imNoise.GetDevice(Intent.Write), imNoise.ElementsReal);
-                                projected.WriteMRC($@"{OutDirectory}\Thread_{args.ThreadId}_projected_with_ctf.mrc", true);
-                                //imNoise.Multiply(0.1f);
                                 projected.Add(imNoise);
-                                projected.WriteMRC($@"{OutDirectory}\Thread_{args.ThreadId}_projected_noisy.mrc", true);
                                 imNoise.Dispose();
                             }*/
+                            projected.TransformValues(val =>
+                            {
+                                //https://stackoverflow.com/a/218600/5012099
+                                double u1 = 1.0 - NoiseRand.NextDouble(); //uniform(0,1] random doubles
+                                double u2 = 1.0 - NoiseRand.NextDouble();
+                                double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) *
+                                             Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
+                                double randNormal = 0 + 1.0 * randStdNormal;
+                                return (float)(val + randNormal);
+                            });
                             Image projectedScaled = projected.AsScaled(new int2(Dim));
-                            projectedScaled.WriteMRC($@"{OutDirectory}\Thread_{args.ThreadId}_projectedScaled.mrc", true);
-                            projectedScaled.Bandpass(0, 1.0f, false, 0.05f);
+                            //projectedScaled.WriteMRC($@"{OutDirectory}\Thread_{args.ThreadId}_projectedScaled.mrc", true);
+                            //projectedScaled.Bandpass(0, 1.0f, false, 0.05f);
                             projected.Dispose();
                             GPU.CopyDeviceToDevice(projectedScaled.GetDevice(Intent.Read), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
                             projectedScaled.Dispose();
