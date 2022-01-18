@@ -47,8 +47,8 @@ namespace ParticleWGANDev
             public decimal Reduction;
             public float Lambda;
             public int DiscIters;
-            public String LogFileName;
-            public String OutDirectory;
+            public string LogFileName;
+            public string OutDirectory;
             public StartUpSettings(int batchSize, decimal learningRate, decimal reduction, float lambda, int discIters, string logFileName, string outDirectory)
             {
                 BatchSize = batchSize;
@@ -61,7 +61,7 @@ namespace ParticleWGANDev
             }
         }
 
-        public static StartUpSettings settings = new(16, 0.001M, 0.9M, 0.01f, 8, "log.txt", @"D:\GAN_recon_polcompl\");
+        public static StartUpSettings Settings = new(16, 0.001M, 0.9M, 0.01f, 8, "log.txt", @"D:\GAN_recon_polcompl\");
 
         private void CheckSaveRecs_Checked(object sender, RoutedEventArgs e) { ShouldSaveRecs = true; }
         private void CheckSaveRecs_Unchecked(object sender, RoutedEventArgs e) { ShouldSaveRecs = false; }
@@ -92,15 +92,11 @@ namespace ParticleWGANDev
         private string DirectoryReal = "particles";
         private string DirectoryFake = "sim";
         const int numEpochs = 100;
-        const int Dim = 64;
-        const int Dim_zoom = 128;
+        const int DimGenerator = 64;
+        const int DimZoom = 128;
         decimal reduction = 0.9M;
         const double sigmaShiftPix = 0.5;
-        const double sigmaShiftRel = sigmaShiftPix / (Dim_zoom / 2);
-        /*
-        private double sigmaShiftPix = 0.0d;
-        private double sigmaShiftRel = 0.0d;
-        */
+        const double sigmaShiftRel = sigmaShiftPix / (DimZoom / 2);
         private double LowPass = 1.0;
 
         private int BatchSize = 32;
@@ -115,19 +111,19 @@ namespace ParticleWGANDev
         public MainWindow()
         {
             InitializeComponent();
-            BatchSize = settings.BatchSize;
-            LearningRate = settings.LearningRate;
-            reduction = settings.Reduction;
-            Lambda = settings.Lambda;
-            DiscIters = settings.DiscIters;
+            BatchSize = Settings.BatchSize;
+            LearningRate = Settings.LearningRate;
+            reduction = Settings.Reduction;
+            Lambda = Settings.Lambda;
+            DiscIters = Settings.DiscIters;
 
-            this.OutDirectory = $@"{MainWindow.settings.OutDirectory}\";
-            if (!(Directory.Exists(OutDirectory)))
+            OutDirectory = $@"{Settings.OutDirectory}\";
+            if (!Directory.Exists(OutDirectory))
             {
-                Directory.CreateDirectory(OutDirectory);
+                _ = Directory.CreateDirectory(OutDirectory);
             }
             
-            this.logFileName = $@"{MainWindow.settings.OutDirectory}\{MainWindow.settings.LogFileName}";
+            logFileName = $@"{Settings.OutDirectory}\{Settings.LogFileName}";
             //doTraining();
             SliderLearningRate.DataContext = this;
             ButtonStartParticle.IsEnabled = false;
@@ -143,17 +139,17 @@ namespace ParticleWGANDev
             int seed = 42;
             WriteToLog("Loading model... (" + GPU.GetFreeMemory(ProcessingDevice) + " MB free)");
             Torch.SetSeed(seed);
-            //ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 32, new[] { 1 }, BatchSize);
-            //Image refVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(Dim));
-            ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(Dim), new[] { ProcessingDevice }, BatchSize);
+            //ParticleWGAN TrainModel = new ParticleWGAN(new int2(DimGenrator), 32, new[] { 1 }, BatchSize);
+            //Image refVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_1k_unfil.mrc")).AsScaled(new int3(DimGenrator));
+            ReconstructionWGAN TrainModel = new ReconstructionWGAN(new int2(DimGenerator), new[] { ProcessingDevice }, BatchSize);
             TrainModel.SigmaShift = sigmaShiftRel;
             //TrainModel.Load(@"D:\GAN_recon_polcompl\ParticleWGAN_SN_20210910_161349.pt");
             WriteToLog("Done. (" + GPU.GetFreeMemory(ProcessingDevice) + " MB free)");
 
             GPU.SetDevice(PreProcessingDevice);
 
-            Image[] ImagesReal = Helper.ArrayOfFunction(i => new Image(new int3(Dim, Dim, BatchSize)), DiscIters + 1);
-            Image[] ImagesCTF = Helper.ArrayOfFunction(i => new Image(new int3(Dim, Dim, BatchSize), true), DiscIters + 1);
+            Image[] ImagesReal = Helper.ArrayOfFunction(i => new Image(new int3(DimGenerator, DimGenerator, BatchSize)), DiscIters + 1);
+            Image[] ImagesCTF = Helper.ArrayOfFunction(i => new Image(new int3(DimGenerator, DimGenerator, BatchSize), true), DiscIters + 1);
             float[][] ImagesAngles = Helper.ArrayOfFunction(i => new float[BatchSize * 3], DiscIters + 1);
 
             Semaphore ReloadBlock = new Semaphore(1, 1);
@@ -171,13 +167,6 @@ namespace ParticleWGANDev
             //TableIn = TableIn.CreateSubset(KeepRows);
 
             int DimRaw = MapHeader.ReadFromFile(Path.Combine(WorkingDirectory, "Refine3D_CryoSparcSelected_run_class001.mrc")).Dimensions.X;
-
-            //int DimRaw = 240;
-            //TableIn.AddColumn("rlnVoltage", "200.0");
-            //TableIn.AddColumn("rlnSphericalAberration", "2.7");
-            //TableIn.AddColumn("rlnAmplitudeContrast", "0.07");
-            //TableIn.AddColumn("rlnDetectorPixelSize", "1.5");
-            //TableIn.AddColumn("rlnMagnification", "10000");
 
             var AllParticleAddresses = new (int id, string name)[TableIn.RowCount];
             /*
@@ -199,20 +188,6 @@ namespace ParticleWGANDev
 
             float3[] RandomParticleAngles = Helper.GetHealpixAngles(3).Select(s => s * Helper.ToRad).ToArray();
 
-            /*Image cleanProjection;
-            {
-                Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "run_ct7_class001.mrc"));
-                if (Dim_zoom != DimRaw)
-                    TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - Dim_zoom) / 2), new int3(Dim_zoom));
-                int Dim_volume = DimRaw;
-                TrefVolume = TrefVolume.AsScaled(new int3(Dim));
-                var TProj = new Projector(TrefVolume, 2);
-                cleanProjection = TProj.ProjectToRealspace(new int2(Dim), new float3[] { new float3(0) });
-                cleanProjection.MaskSpherically(Dim / 2, Dim / 8, false);
-                //cleanProjection.Normalize();
-                cleanProjection.WriteMRC("cleanProjection.mrc", true);
-                cleanProjection.FreeDevice();
-            }*/
             int numParticles = RandomParticleAngles.Length;
             int currentEpoch = 0;
             ParameterizedThreadStart ReloadLambda = (par) =>
@@ -220,15 +195,9 @@ namespace ParticleWGANDev
                 ThreadArgs args = (ThreadArgs)par;
                 GPU.SetDevice(PreProcessingDevice);
                 Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "Refine3D_CryoSparcSelected_run_class001.mrc"));
-                if (Dim_zoom != DimRaw)
-                    TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - Dim_zoom) / 2), new int3(Dim_zoom));
-                int Dim_volume = 128;
-                //TrefVolume = TrefVolume.AsScaled(new int3(Dim));
-                var TProj = new Projector(TrefVolume, 2);
-                var TensorRefVolume = Float32Tensor.Empty(new long[] { 1, Dim_volume, Dim_volume, Dim_volume }, DeviceType.CUDA, PreProcessingDevice);
-                GPU.CopyDeviceToDevice(TrefVolume.GetDevice(Intent.Read), TensorRefVolume.DataPtr(), TrefVolume.ElementsReal);
-                var TGenerator = TorchSharp.NN.Modules.ReconstructionWGANGenerator(TensorRefVolume, Dim_volume);
-                var TensorAngles = Float32Tensor.Zeros(new long[] { BatchSize, 3 }, DeviceType.CUDA, PreProcessingDevice);
+                if (DimZoom != DimRaw)
+                    TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - DimZoom) / 2), new int3(DimZoom));
+                Projector TProj = new Projector(TrefVolume, 2);
 
                 Random ReloadRand = new Random(args.ThreadId);
                 Random NoiseRand = new Random(args.ThreadId);
@@ -236,19 +205,17 @@ namespace ParticleWGANDev
                 bool OwnBatchUsed = true;
                 Image LoadStack = new Image(new int3(DimRaw, DimRaw, BatchSize));
 
-                Image[] TImagesReal = Helper.ArrayOfFunction(i => new Image(new int3(Dim, Dim, BatchSize)), DiscIters + 1);
-                Image[] TImagesCTFFull = Helper.ArrayOfFunction(i => { Image im = new Image(new int3(Dim_volume, Dim_volume, BatchSize), true); im.Fill(1); return im; }, DiscIters + 1);
-                Image[] TImagesCTFScaled = Helper.ArrayOfFunction(i => { Image im = new Image(new int3(Dim, Dim, BatchSize), true); im.Fill(1); return im; }, DiscIters + 1);
-                
-                
+                Image[] TImagesReal = Helper.ArrayOfFunction(i => new Image(new int3(DimGenerator, DimGenerator, BatchSize)), DiscIters + 1);
+                Image[] TImagesCTFFull = Helper.ArrayOfFunction(i => { Image im = new Image(new int3(DimZoom, DimZoom, BatchSize), true); im.Fill(1); return im; }, DiscIters + 1);
+                Image[] TImagesCTFScaled = Helper.ArrayOfFunction(i => { Image im = new Image(new int3(DimGenerator, DimGenerator, BatchSize), true); im.Fill(1); return im; }, DiscIters + 1);
+
                 float[][] TImagesAngles = Helper.ArrayOfFunction(i => new float[BatchSize * 3], DiscIters + 1);
-                Image CTFCoordsFull = CTF.GetCTFCoords(Dim_volume, Dim_volume);
-                Image CTFCoordsScaled = CTF.GetCTFCoords(Dim, Dim_zoom);
+                Image CTFCoordsFull = CTF.GetCTFCoords(DimZoom, DimZoom);
+                Image CTFCoordsScaled = CTF.GetCTFCoords(DimGenerator, DimZoom);
                 float2[][] scaledCoords = CTFCoordsScaled.GetHostComplexCopy();
                 float2[][] FullCoords = CTFCoordsFull.GetHostComplexCopy();
 
-                
-                Image CTFMaskFull = new Image(new int3(Dim_volume, Dim_volume, BatchSize), true);
+                Image CTFMaskFull = new Image(new int3(DimZoom, DimZoom, BatchSize), true);
                 CTFMaskFull.Fill(1);
                 CTFMaskFull.TransformValues((x, y, z, val) =>
                 {
@@ -273,12 +240,12 @@ namespace ParticleWGANDev
                     }
                     else
                     {
-                        filter = (r >= 0 && r <= 1) ? 1 : 0;
+                        filter = (r is >= 0 and <= 1) ? 1 : 0;
                     }
 
                     return val * filter;
                 });
-                Image CTFMaskScaled = new Image(new int3(Dim, Dim, BatchSize), true);
+                Image CTFMaskScaled = new Image(new int3(DimGenerator, DimGenerator, BatchSize), true);
                 CTFMaskScaled.Fill(1);
                 CTFMaskScaled.TransformValues((x, y, z, val) =>
                 {
@@ -303,7 +270,7 @@ namespace ParticleWGANDev
                     }
                     else
                     {
-                        filter = (r >= 0 && r <= 1) ? 1 : 0;
+                        filter = (r is >= 0 and <= 1) ? 1 : 0;
                     }
 
                     return val * filter;
@@ -311,10 +278,10 @@ namespace ParticleWGANDev
                 
 
                 int PlanForw = 0, PlanBack = 0;
-                if (DimRaw != Dim)
+                if (DimRaw != DimGenerator)
                 {
                     PlanForw = GPU.CreateFFTPlan(new int3(DimRaw, DimRaw, 1), (uint)BatchSize);
-                    PlanBack = GPU.CreateIFFTPlan(new int3(Dim, Dim, 1), (uint)BatchSize);
+                    PlanBack = GPU.CreateIFFTPlan(new int3(DimGenerator, DimGenerator, 1), (uint)BatchSize);
                 }
 
                 while (!args.Token.IsCancellationRequested)
@@ -331,16 +298,10 @@ namespace ParticleWGANDev
 
                             float3[] theseAngles = Helper.IndexedSubset(RandomParticleAngles, AngleIds);
                             
-                            //float3[] theseAngles = Helper.ArrayOfFunction(i => new float3(0), BatchSize);
                             TImagesAngles[iterTrain] = Helper.ToInterleaved(theseAngles);
-                            GPU.CopyHostToDevice(TImagesAngles[iterTrain], TensorAngles.DataPtr(), TImagesAngles[iterTrain].Length);
 
-                            Image projected = TProj.ProjectToRealspace(new int2(Dim_volume), theseAngles);
-                            /*Image projected = new Image(new int3(Dim,Dim, theseAngles.Length));
-                            using (TorchTensor tensorproj = TGenerator.Forward(TensorAngles, false))
-                            {
-                                GPU.CopyDeviceToDevice(tensorproj.DataPtr(), projected.GetDevice(Intent.Write), projected.ElementsReal);
-                            }*/
+                            Image projected = TProj.ProjectToRealspace(new int2(DimZoom), theseAngles);
+
                             float3[] shiftsPix = Helper.ArrayOfFunction(i =>
                             {
                                 float x, y;
@@ -361,9 +322,9 @@ namespace ParticleWGANDev
                                 return new float3(x, y, 0);
                             }, projected.Dims.Z);
 
-                            //projected.ShiftSlices(shiftsPix);
+                            projected.ShiftSlices(shiftsPix);
 
-                            float3[] shiftsRel = Helper.ArrayOfFunction(i => shiftsPix[i] * 1.0f / (Dim_volume / 2), shiftsPix.Length);
+                            float3[] shiftsRel = Helper.ArrayOfFunction(i => shiftsPix[i] * 1.0f / (DimZoom / 2), shiftsPix.Length);
 
 
                             GPU.CheckGPUExceptions();
@@ -383,26 +344,18 @@ namespace ParticleWGANDev
                               false,
                               (uint)BatchSize);
 
-                            //TImagesCTFFull[iterTrain].Fill(1);
-                            //TImagesCTFScaled[iterTrain].Fill(1);
-                            //projected.WriteMRC($@"{OutDirectory}\Thread_{args.ThreadId}_projected_clean.mrc", true);
                             {
                                 Image thisCTFSign = TImagesCTFFull[iterTrain].GetCopy();
                                 thisCTFSign.Sign();
                                 TImagesCTFFull[iterTrain].Multiply(thisCTFSign);
-                                //TImagesCTFFull[iterTrain].WriteMRC($@"{OutDirectory}\Thread_{args.ThreadId}_CTFFull.mrc", true);
                                 TImagesCTFFull[iterTrain].Multiply(CTFMaskFull);
-                                //TImagesCTFFull[iterTrain].WriteMRC($@"{OutDirectory}\Thread_{par}_CTFFullMasked.mrc", true);
                                 thisCTFSign.Dispose();
                             }
                             {
-                                //TImagesCTFScaled[iterTrain].WriteMRC($@"{OutDirectory}\Thread_{par}_CTFScaled.mrc", true);
                                 Image thisCTFSign = TImagesCTFScaled[iterTrain].GetCopy();
                                 thisCTFSign.Sign();
                                 TImagesCTFScaled[iterTrain].Multiply(thisCTFSign);
-                                //TImagesCTFScaled[iterTrain].WriteMRC($@"{OutDirectory}\Thread_{args.ThreadId}_CTFScaled.mrc", true);
                                 TImagesCTFScaled[iterTrain].Multiply(CTFMaskScaled);
-                                //TImagesCTFScaled[iterTrain].WriteMRC($@"{OutDirectory}\Thread_{par}_CTFScaledMasked.mrc", true);
                                 thisCTFSign.Dispose();
                             }
                             {
@@ -412,14 +365,7 @@ namespace ParticleWGANDev
                                 projected = fft.AsIFFT(false, 0, true);
                                 fft.Dispose();
                             }
-                            /*
-                            using (TorchTensor noise = Float32Tensor.RandomN(new long[] { projected.Dims.Z, projected.Dims.Y, projected.Dims.X }, DeviceType.CUDA, PreProcessingDevice))
-                            {
-                                Image imNoise = new Image(projected.Dims);
-                                GPU.CopyDeviceToDevice(noise.DataPtr(), imNoise.GetDevice(Intent.Write), imNoise.ElementsReal);
-                                projected.Add(imNoise);
-                                imNoise.Dispose();
-                            }*/
+
                             projected.TransformValues(val =>
                             {
                                 //https://stackoverflow.com/a/218600/5012099
@@ -430,9 +376,8 @@ namespace ParticleWGANDev
                                 double randNormal = 0 + 1.0 * randStdNormal;
                                 return (float)(val + randNormal);
                             });
-                            Image projectedScaled = projected.AsScaled(new int2(Dim));
-                            //projectedScaled.WriteMRC($@"{OutDirectory}\Thread_{args.ThreadId}_projectedScaled.mrc", true);
-                            //projectedScaled.Bandpass(0, 1.0f, false, 0.05f);
+                            Image projectedScaled = projected.AsScaled(new int2(DimGenerator));
+                            projectedScaled.Bandpass(0, 1.0f, false, 0.05f);
                             projected.Dispose();
                             GPU.CopyDeviceToDevice(projectedScaled.GetDevice(Intent.Read), TImagesReal[iterTrain].GetDevice(Intent.Write), TImagesReal[iterTrain].ElementsReal);
                             projectedScaled.Dispose();
@@ -441,7 +386,7 @@ namespace ParticleWGANDev
                         OwnBatchUsed = false;
                     }
 
-                    ReloadBlock.WaitOne();
+                    _ = ReloadBlock.WaitOne();
                     // If previously pushed batch from any thread has already been processed
                     if (HasBeenProcessed)
                     {
@@ -456,15 +401,16 @@ namespace ParticleWGANDev
                         OwnBatchUsed = true;
                         HasBeenProcessed = false;
                     }
-                    ReloadBlock.Release();
+                    _ = ReloadBlock.Release();
                 }
             };
 
-            //ReloadLambda(0);
             CancellationTokenSource ThreadSource = new();
             Thread[] ReloadThreads = Helper.ArrayOfFunction(i => new Thread(ReloadLambda), NThreads);
             for (int i = 0; i < NThreads; i++)
+            {
                 ReloadThreads[i].Start(new ThreadArgs(ThreadSource.Token, i));
+            }
 
             GPU.SetDevice(ProcessingDevice);
 
@@ -480,7 +426,9 @@ namespace ParticleWGANDev
             while (true)
             {
                 if (HasBeenProcessed)
+                {
                     continue;
+                }
 
                 if ((IterationsDone + 1) * BatchSize < 2 * numParticles)
                 {
@@ -488,11 +436,9 @@ namespace ParticleWGANDev
                     TrainModel.set_discriminator_grad_clip_val(clipVal);
                     clipVal = (IterationsDone + 1) * BatchSize * (DiscIters + 1) * 1e4 / (2 * numParticles);
                     TrainModel.set_generator_grad_clip_val(clipVal);
-
-                    //TrainModel.set_generator_grad_clip_val(1e10);
                 }
 
-                ReloadBlock.WaitOne();
+                _ = ReloadBlock.WaitOne();
 
                 List<float> AllLossesReal = new List<float>();
                 List<float> AllLossesFake = new List<float>();
@@ -506,15 +452,10 @@ namespace ParticleWGANDev
                 Image PredictionDisc = null;
                 Image PredictionGen = null;
                 Image PredictionGenNoisy = null;
-                float[] SourceData = null;
-                float[] TargetData = null;
-                float[] AverageData = null;
-                var allImages = Image.getObjectIDs();
-                var allOnDevice = Image.getonDevice();
                 {
 
                     float CurrentLearningRate = 0;
-                    Dispatcher.Invoke(() => CurrentLearningRate = (float)LearningRate);
+                    _ = Dispatcher.Invoke(() => CurrentLearningRate = (float)LearningRate);
 
                     if (ShouldTrainOnlyGen)
                     {
@@ -580,60 +521,8 @@ namespace ParticleWGANDev
 
                 if (IterationsDone % 10 == 0)
                 {
-                    float FRCResolution = 0.0f;
-                    /*
-                    {
-                        Image predictionGenCopy = PredictionGen.AsSliceXY(0);
-                        GPU.CheckGPUExceptions();
-                        predictionGenCopy.MaskSpherically(Dim / 2, Dim / 8, false);
-                        //predictionGenCopy.Normalize();
-                        GPU.CheckGPUExceptions();
-                        predictionGenCopy.WriteMRC($@"{OutDirectory}\PredictionGen_{IterationsDone}.mrc", true);
-                        
-                        Image PredictionGenFT = predictionGenCopy.AsFFT();
-                        GPU.CheckGPUExceptions();
-                        float[][] PredictionGenFTData = PredictionGenFT.GetHost(Intent.Read);
-                        Image CleanProjectionsFT = cleanProjection.AsFFT();
-                        GPU.CheckGPUExceptions();
-                        float[][] CleanProjectionsFTData = CleanProjectionsFT.GetHost(Intent.Read);
 
-                        float3[] Shells = new float3[PredictionGen.Dims.X / 2];
-                        for (int a = 0; a < 1; a++)
-                        {
-                            float[] AData = PredictionGenFTData[a];
-                            float[] RData = CleanProjectionsFTData[a];
-
-                            int i = 0;
-                            Helper.ForEachElementFT(new int2(PredictionGenFT.Dims.X), (x, y, xx, yy, r, angle) =>
-                            {
-                                int R = (int)Math.Round(r);
-                                if (R >= Shells.Length)
-                                    return;
-
-                                float2 A = new float2(AData[i * 2], AData[i * 2 + 1]);
-                                float2 B = new float2(RData[i * 2], RData[i * 2 + 1]);
-
-                                float AB = A.X * B.X + A.Y * B.Y;
-                                float A2 = A.LengthSq();
-                                float B2 = B.LengthSq();
-
-                                Shells[R] += new float3(AB, A2, B2);
-
-                                i++;
-                            });
-                        }
-
-                        float[] FRC = Shells.Select(v => v.X / (float)Math.Max(1e-16, Math.Sqrt(v.Y * v.Z))).ToArray();
-                        int waveNumber = 0;
-                        for (waveNumber = 0; waveNumber < FRC.Length && FRC[waveNumber] >= 0.5; waveNumber++) ;
-                        FRCResolution = waveNumber > 1 ? Dim * (3 * 128 / Dim) / (waveNumber - 1) : (float)(Dim * (3 * 128 / Dim));
-                        GPU.CheckGPUExceptions();
-                        predictionGenCopy.Dispose();
-                        PredictionGenFT.Dispose();
-                        CleanProjectionsFT.Dispose();
-                    }
-                    */
-                    WriteToLog($"{MathHelper.Mean(AllLossesReal):#.##E+00}, {MathHelper.Mean(AllLossesFake):#.##E+00}, {MathHelper.Max(AllGradNormDisc):#.##E+00}, {MathHelper.Max(AllGradNormGen):#.##E+00}, {FRCResolution}");
+                    WriteToLog($"{MathHelper.Mean(AllLossesReal):#.##E+00}, {MathHelper.Mean(AllLossesFake):#.##E+00}, {MathHelper.Max(AllGradNormDisc):#.##E+00}, {MathHelper.Max(AllGradNormGen):#.##E+00}");
 
                     LossPointsReal.Add(new ObservablePoint(IterationsDone, -1 * MathHelper.Mean(AllLossesReal)));
                     Dispatcher.Invoke(() => SeriesLossReal.Values = new ChartValues<ObservablePoint>(LossPointsReal));
@@ -646,23 +535,24 @@ namespace ParticleWGANDev
 
                     GradNormGenPoints.Add(new ObservablePoint(IterationsDone, MathHelper.Max(AllGradNormGen)));
                     Dispatcher.Invoke(() => SeriesGradNormGen.Values = new ChartValues<ObservablePoint>(GradNormGenPoints));
-                    //float2 GlobalMeanStd = MathHelper.MeanAndStd(ImagesReal[0].GetHost(Intent.Read)[0]);
+
 
                     Func<float[], float2, ImageSource> MakeImage = (data, stat) =>
                     {
                         float[] OneSlice = data.ToArray();
-                        //GlobalMeanStd = MathHelper.MeanAndStd(OneSlice);
 
                         byte[] BytesXY = new byte[OneSlice.Length];
-                        for (int y = 0; y < Dim; y++)
-                            for (int x = 0; x < Dim; x++)
+                        for (int y = 0; y < DimGenerator; y++)
+                        {
+                            for (int x = 0; x < DimGenerator; x++)
                             {
-                                float Value = (OneSlice[y * Dim + x] - stat.X) / stat.Y;
+                                float Value = (OneSlice[y * DimGenerator + x] - stat.X) / stat.Y;
                                 Value = (Value + 4f) / 8f;
-                                BytesXY[(Dim - 1 - y) * Dim + x] = (byte)(Math.Max(0, Math.Min(1, Value)) * 255);
+                                BytesXY[(DimGenerator - 1 - y) * DimGenerator + x] = (byte)(Math.Max(0, Math.Min(1, Value)) * 255);
                             }
+                        }
 
-                        ImageSource SliceImage = BitmapSource.Create(Dim, Dim, 96, 96, PixelFormats.Indexed8, BitmapPalettes.Gray256, BytesXY, Dim);
+                        ImageSource SliceImage = BitmapSource.Create(DimGenerator, DimGenerator, 96, 96, PixelFormats.Indexed8, BitmapPalettes.Gray256, BytesXY, DimGenerator);
                         SliceImage.Freeze();
 
                         return SliceImage;
@@ -672,42 +562,34 @@ namespace ParticleWGANDev
                     float2 stat = MathHelper.MeanAndStd(all_data);
                     {
                         ImageSource SliceImage = MakeImage(ImagesReal[DiscIters].GetHost(Intent.Read)[0], stat);
-                        Dispatcher.Invoke(() => ImageSource.Source = SliceImage);
+                        _ = Dispatcher.Invoke(() => ImageSource.Source = SliceImage);
                     }
 
                     {
                         ImageSource SliceImage = MakeImage(PredictionGenNoisy.GetHost(Intent.Read)[0], stat);
-                        Dispatcher.Invoke(() => ImageTarget.Source = SliceImage);
+                        _ = Dispatcher.Invoke(() => ImageTarget.Source = SliceImage);
                     }
 
                     {
                         ImageSource SliceImage = MakeImage(PredictionGen.GetHost(Intent.Read)[0], stat);
-                        Dispatcher.Invoke(() => ImageAverage.Source = SliceImage);
+                        _ = Dispatcher.Invoke(() => ImageAverage.Source = SliceImage);
                     }
-
-                    //PredictionGen.WriteMRC("d_gen.mrc", true);
-
 
                     AllLossesReal.Clear();
                     AllLossesFake.Clear();
                 }
 
                 IterationsDone++;
-                Dispatcher.Invoke(() => TextCoverage.Text = $"{IterationsDone} iterations done");
-
-                /*if ((IterationsDone + 1) % 1400 == 0)
-                {
-                    //Dispatcher.Invoke(() => LearningRate /= 2);
-                    ShouldSaveModel = true;
-                }*/
+                _ = Dispatcher.Invoke(() => TextCoverage.Text = $"{IterationsDone} iterations done");
 
                 if ((IterationsDone * BatchSize * (DiscIters + 1)) > (currentEpoch + 1) * numParticles)
                 {
                     if (currentEpoch %10 ==0 || currentEpoch==numEpochs-1)
+                    {
                         ShouldSaveModel = true;
+                    }
                     currentEpoch += 1;
-                    Dispatcher.Invoke(() => LearningRate = LearningRate * reduction);
-                    
+                    _ = Dispatcher.Invoke(() => LearningRate = LearningRate * reduction);                   
                 }
 
                 if (ShouldSaveModel)
@@ -715,19 +597,18 @@ namespace ParticleWGANDev
                     ShouldSaveModel = false;
                     string datestring = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                     TrainModel.Save(OutDirectory + @"ParticleWGAN_SN_" + datestring + ".pt");
-                    var imageVolume = TrainModel.getVolume();
+                    Image imageVolume = TrainModel.getVolume();
                     imageVolume.WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + ".mrc", true);
                     Image resized;
-                    if (Dim != Dim_zoom)
-                        resized = imageVolume.AsScaled(new int3(Dim_zoom));
+                    if (DimGenerator != DimZoom)
+                        resized = imageVolume.AsScaled(new int3(DimZoom));
                     else
                         resized = imageVolume;
 
-                    if (Dim_zoom != DimRaw)
+                    if (DimZoom != DimRaw)
                         resized = resized.AsPadded(new int3(DimRaw));
                     resized.WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + "_resized.mrc", true);
-
-                    resized.MaskSpherically(Dim / 2, Dim / 8, false);
+                    resized.MaskSpherically(DimGenerator / 2, DimGenerator / 8, false);
                     resized.WriteMRC(OutDirectory + @"ParticleWGAN_SN_" + datestring + "_resized_masked.mrc", true);
                     imageVolume.Dispose();
                     Thread.Sleep(10000);
@@ -758,7 +639,7 @@ namespace ParticleWGANDev
                     Application.Current.Dispatcher.Invoke(() => this.Close());
                     return;
                 }
-                ReloadBlock.Release();
+                _ = ReloadBlock.Release();
             }
         }
 
@@ -800,7 +681,7 @@ namespace ParticleWGANDev
         private void ButtonTest_OnClick_old(object sender, RoutedEventArgs e)
         {
             WriteToLog("Loading model... (" + GPU.GetFreeMemory(0) + " MB free)");
-            ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 32, new[] { 0 }, BatchSize);
+            ParticleWGAN TrainModel = new ParticleWGAN(new int2(DimGenerator), 32, new[] { 0 }, BatchSize);
             TrainModel.Load(WorkingDirectory + "ParticleWGAN_20210108_002634.pt");
             WriteToLog("Done. (" + GPU.GetFreeMemory(0) + " MB free)");
 
@@ -852,16 +733,16 @@ namespace ParticleWGANDev
 
                 Image LoadStack = new Image(new int3(DimRaw, DimRaw, BatchSize));
 
-                Image TImagesFake = new Image(new int3(Dim, Dim, BatchSize));
-                Image TImagesCTF = new Image(new int3(Dim, Dim, BatchSize), true);
+                Image TImagesFake = new Image(new int3(DimGenerator, DimGenerator, BatchSize));
+                Image TImagesCTF = new Image(new int3(DimGenerator, DimGenerator, BatchSize), true);
 
-                Image CTFCoords = CTF.GetCTFCoords(Dim, DimRaw);
+                Image CTFCoords = CTF.GetCTFCoords(DimGenerator, DimRaw);
 
                 int PlanForw = 0, PlanBack = 0;
-                if (DimRaw != Dim)
+                if (DimRaw != DimGenerator)
                 {
                     PlanForw = GPU.CreateFFTPlan(new int3(DimRaw, DimRaw, 1), (uint)BatchSize);
-                    PlanBack = GPU.CreateIFFTPlan(new int3(Dim, Dim, 1), (uint)BatchSize);
+                    PlanBack = GPU.CreateIFFTPlan(new int3(DimGenerator, DimGenerator, 1), (uint)BatchSize);
                 }
 
                 int NDone = 0;
@@ -885,7 +766,7 @@ namespace ParticleWGANDev
                                                 new[] { LoadStackData[b] });
                     }
 
-                    if (Dim == DimRaw)
+                    if (DimGenerator == DimRaw)
                         GPU.CopyDeviceToDevice(LoadStack.GetDevice(Intent.Read),
                                                 TImagesFake.GetDevice(Intent.Write),
                                                 LoadStack.ElementsReal);
@@ -930,7 +811,7 @@ namespace ParticleWGANDev
             NThreads = 1;
 
             WriteToLog("Loading model... (" + GPU.GetFreeMemory(0) + " MB free)");
-            ParticleWGAN TrainModel = new ParticleWGAN(new int2(Dim), 64, new[] { 1 }, BatchSize);
+            ParticleWGAN TrainModel = new ParticleWGAN(new int2(DimGenerator), 64, new[] { 1 }, BatchSize);
             TrainModel.Load(WorkingDirectory + "ParticleWGAN_20210111_210604.pt");
             WriteToLog("Done. (" + GPU.GetFreeMemory(0) + " MB free)");
 
@@ -976,16 +857,16 @@ namespace ParticleWGANDev
             {
                 Image LoadStack = new Image(new int3(DimRaw, DimRaw, BatchSize));
 
-                Image TImagesFake = new Image(new int3(Dim, Dim, BatchSize));
-                Image TImagesCTF = new Image(new int3(Dim, Dim, BatchSize), true);
+                Image TImagesFake = new Image(new int3(DimGenerator, DimGenerator, BatchSize));
+                Image TImagesCTF = new Image(new int3(DimGenerator, DimGenerator, BatchSize), true);
 
-                Image CTFCoords = CTF.GetCTFCoords(Dim, DimRaw);
+                Image CTFCoords = CTF.GetCTFCoords(DimGenerator, DimRaw);
 
                 int PlanForw = 0, PlanBack = 0;
-                if (DimRaw != Dim)
+                if (DimRaw != DimGenerator)
                 {
                     PlanForw = GPU.CreateFFTPlan(new int3(DimRaw, DimRaw, 1), (uint)BatchSize);
-                    PlanBack = GPU.CreateIFFTPlan(new int3(Dim, Dim, 1), (uint)BatchSize);
+                    PlanBack = GPU.CreateIFFTPlan(new int3(DimGenerator, DimGenerator, 1), (uint)BatchSize);
                 }
 
                 List<Star> AllTables = new List<Star>();
@@ -995,7 +876,7 @@ namespace ParticleWGANDev
                     int[] StackIDs = Helper.ArrayOfSequence(0, AllParticleAddresses.Length, 1).Where(i => AllParticleAddresses[i].name == stackName).ToArray();
                     int NParticles = StackIDs.Length;
 
-                    Image ParticleStack = new Image(new int3(Dim - 16, Dim - 16, NParticles));
+                    Image ParticleStack = new Image(new int3(DimGenerator - 16, DimGenerator - 16, NParticles));
 
                     for (int batchStart = 0; batchStart < NParticles; batchStart += BatchSize)
                     {
@@ -1018,7 +899,7 @@ namespace ParticleWGANDev
                                                     new[] { LoadStackData[b] });
                         }
 
-                        if (Dim == DimRaw)
+                        if (DimGenerator == DimRaw)
                             GPU.CopyDeviceToDevice(LoadStack.GetDevice(Intent.Read),
                                                     TImagesFake.GetDevice(Intent.Write),
                                                     LoadStack.ElementsReal);
@@ -1053,7 +934,7 @@ namespace ParticleWGANDev
 
                         GPU.Pad(Predicted.GetDevice(Intent.Read),
                                 ParticleStack.GetDeviceSlice(batchStart, Intent.Write),
-                                new int3(Dim, Dim, 1),
+                                new int3(DimGenerator, DimGenerator, 1),
                                 ParticleStack.Dims.Slice(),
                                 (uint)CurBatch);
                     }
@@ -1062,7 +943,7 @@ namespace ParticleWGANDev
                     GPU.NormParticles(ParticleStack.GetDevice(Intent.Read),
                                       ParticleStack.GetDevice(Intent.Write),
                                       ParticleStack.Dims.Slice(),
-                                      (uint)(Dim / 4),
+                                      (uint)(DimGenerator / 4),
                                       false,
                                       (uint)NParticles);
 

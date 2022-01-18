@@ -1,18 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
+
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 using Warp.Tools;
 using TorchSharp.Tensor;
 using TorchSharp.NN;
 using static TorchSharp.NN.Modules;
-using static TorchSharp.NN.Functions;
-using static TorchSharp.NN.Losses;
-using static TorchSharp.ScalarExtensionMethods;
 using TorchSharp;
 
 namespace Warp.NNModels
@@ -152,9 +146,6 @@ namespace Warp.NNModels
             OptimizerDisc = Optimizer.Adam(Discriminators[0].GetParameters(), 0.01, 1e-8);
             OptimizerDisc.SetBetasAdam(0.5, 0.9);
 
-            //OptimizerGenVolume = Optimizer.RMSprop(Generators[0].GetParameters().Take(1), 0.01, 1e-8);
-            //OptimizerGen = Optimizer.RMSprop(Generators[0].GetParameters().Skip(1), 0.01, 1e-8);
-            //OptimizerDisc = Optimizer.RMSprop(Discriminators[0].GetParameters(), 0.01, 1e-8);
             ResultPredicted = new Image(IntPtr.Zero, new int3(BoxDimensions.X, BoxDimensions.Y, BatchSize));
             ResultPredictedNoisy = new Image(IntPtr.Zero, new int3(BoxDimensions.X, BoxDimensions.Y, BatchSize));
         }
@@ -256,7 +247,6 @@ namespace Warp.NNModels
                 using (TorchTensor PredictionNoisyMasked = doMaskProjections? PredictionNoisyNormalized.Mul(TensorMask[i]):PredictionNoisyNormalized)
                 using (TorchTensor IsItReal = Discriminators[i].Forward(PredictionNoisyMasked))
                 using (TorchTensor Loss = ((-1) * IsItReal).Mean())
-                //using(TorchTensor Loss = (PredictionConv- TensorTrueImages[i]).Pow(2).Sum())
                 {
 
                     GPU.CopyDeviceToDevice(Prediction.DataPtr(),

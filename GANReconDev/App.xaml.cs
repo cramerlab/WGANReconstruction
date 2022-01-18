@@ -28,7 +28,7 @@ namespace ParticleWGANDev
                 int DiscIters = int.Parse(e.Args[4]); ;
                 string LogFileName = e.Args[5];
                 string OutDirectory = e.Args[6];
-                ParticleWGANDev.MainWindow.settings = new(batchSize, LearningRate, Reduction, Lambda, DiscIters, LogFileName, OutDirectory);
+                ParticleWGANDev.MainWindow.Settings = new(batchSize, LearningRate, Reduction, Lambda, DiscIters, LogFileName, OutDirectory);
             }
         }
     }
