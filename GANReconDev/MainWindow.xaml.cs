@@ -396,17 +396,14 @@ namespace ParticleWGANDev
                                     for (int x = 0; x < projected.Dims.X/2+1; x++)
                                     {
                                         float yy = y >= projected.Dims.Y / 2 + 1 ? y - projected.Dims.Y : y;
-                                        yy /= projected.Dims.Y / 2.0f;
                                         yy *= yy;
 
-
                                         float xx = x;
-                                        xx /= projected.Dims.X / 2.0f;
                                         xx *= xx;
 
                                         float r = (float)Math.Sqrt(xx + yy);
                                         int waveNumber = (int)Math.Round(r);
-                                        waveNumber = Math.Max(waveNumber, projected.Dims.X / 2);
+                                        waveNumber = Math.Min(waveNumber, projected.Dims.X / 2);
                                         complexData[z][y*(projected.Dims.X / 2 + 1 )+ x] = new float2(getGaussian(NoiseRand, 0, theseSigmas[z][waveNumber]), getGaussian(NoiseRand, 0, theseSigmas[z][waveNumber]));
                                     }
                                 }

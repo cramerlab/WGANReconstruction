@@ -29,14 +29,13 @@
         <StackPanel Grid.Column="2" Grid.Row="0" Grid.RowSpan="2" Orientation="Vertical">
             <Button Name="ButtonStartParticle" Content="Run particle" Margin="10" Click="ButtonStartParticle_OnClick" />
             <Button Name="ButtonSave" Content="Save" Margin="10" Click="ButtonSave_OnClick" />
-            <Button Name="ButtonTest" Content="Test" Margin="10" Click="ButtonTest_OnClick" />
             <CheckBox Name="CheckSaveRecs" Content="Write out reconstructions" Margin="10" Checked="CheckSaveRecs_Checked" Unchecked="CheckSaveRecs_Unchecked"/>
             <CheckBox Name="CheckTrainGen" Content="Train Only Generator" Margin="10" Checked="CheckTrainGen_Checked" Unchecked="CheckTrainGen_Unchecked"/>
             <TextBlock Name="TextCoverage" Margin="10" Text="Every particle seen 0.000 times"/>
 
             <sparta:ValueSlider Name="SliderLearningRate" TextFormat="Learning rate: {0}" Value="{Binding LearningRate, Mode=TwoWay}" UpdateTrigger="PropertyChanged" MinValue="0.00000001" MaxValue="1" StepSize="0.0000001" Margin="10" />
 
-            <TextBox Name="TextOutput" Margin="10" Height="230" VerticalScrollBarVisibility="Auto" />
+            <TextBox Name="TextOutput" Margin="5" Height="250" VerticalScrollBarVisibility="Auto" />
         </StackPanel>
 
         <lvc:CartesianChart Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Height="256"  DisableAnimations="True" Hoverable="False" DataTooltip="{x:Null}" IsHitTestVisible="False">
