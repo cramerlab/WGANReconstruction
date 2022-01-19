@@ -322,7 +322,7 @@ namespace ParticleWGANDev
                                 return new float3(x, y, 0);
                             }, projected.Dims.Z);
 
-                            projected.ShiftSlices(shiftsPix);
+                            //projected.ShiftSlices(shiftsPix);
 
                             float3[] shiftsRel = Helper.ArrayOfFunction(i => shiftsPix[i] * 1.0f / (DimZoom / 2), shiftsPix.Length);
 
