@@ -135,6 +135,15 @@ namespace ParticleWGANDev
             Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
         }
 
+        private static float getGaussian(Random rand, double mu, double sigma)
+        {
+            double u1 = 1.0 - rand.NextDouble(); //uniform(0,1] random doubles
+            double u2 = 1.0 - rand.NextDouble();
+            double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) *
+                         Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
+            return (float)(mu + sigma * randStdNormal);
+        }
+
         private void doTraining() {
             int seed = 42;
             WriteToLog("Loading model... (" + GPU.GetFreeMemory(ProcessingDevice) + " MB free)");
@@ -190,6 +199,15 @@ namespace ParticleWGANDev
 
             int numParticles = RandomParticleAngles.Length;
             int currentEpoch = 0;
+
+            string starFileName = @$"{WorkingDirectory}\run_model.star";
+            float[][] AllSigmas = Helper.ArrayOfFunction(i => {
+                Star table = new(starFileName, $"model_group_{i + 1}");
+                string[] column = table.GetColumn("rlnSigma2Noise");
+                float[] entries = column.Select(s => (float)Math.Sqrt(float.Parse(s, NumberStyles.Float, CultureInfo.InvariantCulture))).ToArray();
+                return entries;
+            }, 1874);
+
             ParameterizedThreadStart ReloadLambda = (par) =>
             {
                 ThreadArgs args = (ThreadArgs)par;
@@ -202,6 +220,8 @@ namespace ParticleWGANDev
                 Random ReloadRand = new Random(args.ThreadId);
                 Random NoiseRand = new Random(args.ThreadId);
                 Random ShiftRand = new Random(args.ThreadId);
+                Random sigmaPicker = new Random(args.ThreadId);
+
                 bool OwnBatchUsed = true;
                 Image LoadStack = new Image(new int3(DimRaw, DimRaw, BatchSize));
 
@@ -293,11 +313,12 @@ namespace ParticleWGANDev
                         {
                             int[] SubsetIDs = Helper.RandomSubset(AllIDs, BatchSize, ReloadRand.Next());
                             int[] AngleIds = Helper.ArrayOfFunction(i => ReloadRand.Next(0, RandomParticleAngles.Length), BatchSize);
+                            int[] SigmaIds = Helper.ArrayOfFunction(i => sigmaPicker.Next(0, AllSigmas.Length), BatchSize);
 
                             // Read, and copy or rescale real and fake images from prepared stacks
 
                             float3[] theseAngles = Helper.IndexedSubset(RandomParticleAngles, AngleIds);
-                            
+                            float[][] theseSigmas = Helper.IndexedSubset(AllSigmas, SigmaIds);
                             TImagesAngles[iterTrain] = Helper.ToInterleaved(theseAngles);
 
                             Image projected = TProj.ProjectToRealspace(new int2(DimZoom), theseAngles);
@@ -366,6 +387,36 @@ namespace ParticleWGANDev
                                 fft.Dispose();
                             }
 
+                            Image ColoredNoiseFFT = new Image(projected.Dims, true, true);
+                            float2[][] complexData = Helper.ArrayOfFunction(i => new float2[projected.DimsFTSlice.Elements()], projected.Dims.Z);
+                            for (int z = 0; z < projected.Dims.Z; z++)
+                            {
+                                for (int y = 0; y < projected.Dims.Y; y++)
+                                {
+                                    for (int x = 0; x < projected.Dims.X/2+1; x++)
+                                    {
+                                        float yy = y >= projected.Dims.Y / 2 + 1 ? y - projected.Dims.Y : y;
+                                        yy /= projected.Dims.Y / 2.0f;
+                                        yy *= yy;
+
+
+                                        float xx = x;
+                                        xx /= projected.Dims.X / 2.0f;
+                                        xx *= xx;
+
+                                        float r = (float)Math.Sqrt(xx + yy);
+                                        int waveNumber = (int)Math.Round(r);
+                                        waveNumber = Math.Max(waveNumber, projected.Dims.X / 2);
+                                        complexData[z][y*(projected.Dims.X / 2 + 1 )+ x] = new float2(getGaussian(NoiseRand, 0, theseSigmas[z][waveNumber]), getGaussian(NoiseRand, 0, theseSigmas[z][waveNumber]));
+                                    }
+                                }
+                            }
+                            ColoredNoiseFFT.UpdateHostWithComplex(complexData);
+                            Image ColoredNoise = ColoredNoiseFFT.AsIFFT();
+                            ColoredNoiseFFT.Dispose();
+                            projected.Add(ColoredNoise);
+                            ColoredNoise.Dispose();
+                            /*
                             projected.TransformValues(val =>
                             {
                                 //https://stackoverflow.com/a/218600/5012099
@@ -375,7 +426,7 @@ namespace ParticleWGANDev
                                              Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
                                 double randNormal = 0 + 1.0 * randStdNormal;
                                 return (float)(val + randNormal);
-                            });
+                            });*/
                             Image projectedScaled = projected.AsScaled(new int2(DimGenerator));
                             projectedScaled.Bandpass(0, 1.0f, false, 0.05f);
                             projected.Dispose();
