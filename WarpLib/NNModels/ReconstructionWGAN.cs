@@ -210,6 +210,7 @@ namespace Warp.NNModels
         public void TrainGeneratorParticle(float[] angles,
                                            Image imagesCTF,
                                            Image imagesReal,
+                                           Image imagesNoise,
                                            float learningRate,
                                            out Image prediction,
                                            out Image predictionNoisy,
