@@ -25,6 +25,7 @@ namespace Warp.NNModels
         private TorchTensor[] TensorTrueImages;
         private TorchTensor[] TensorFakeImages;
         private TorchTensor[] TensorCTF;
+        private TorchTensor[] TensorNoise;
         private TorchTensor[] TensorAngles;
 
         private TorchTensor[] TensorOne;
@@ -79,6 +80,7 @@ namespace Warp.NNModels
             TensorTrueImages = new TorchTensor[NDevices];
             TensorFakeImages = new TorchTensor[NDevices];
             TensorCTF = new TorchTensor[NDevices];
+            TensorNoise = new TorchTensor[NDevices];
             TensorAngles = new TorchTensor[NDevices];
 
             TensorOne = new TorchTensor[NDevices];
@@ -99,6 +101,7 @@ namespace Warp.NNModels
 
                 TensorTrueImages[i] = Float32Tensor.Zeros(new long[] { DeviceBatch, 1, BoxDimensions.Y, BoxDimensions.X }, DeviceType.CUDA, DeviceID);
                 TensorFakeImages[i] = Float32Tensor.Zeros(new long[] { DeviceBatch, 1, BoxDimensions.Y, BoxDimensions.X }, DeviceType.CUDA, DeviceID);
+                TensorNoise[i] = Float32Tensor.Zeros(new long[] { DeviceBatch, 1, BoxDimensions.Y, BoxDimensions.X }, DeviceType.CUDA, DeviceID);
                 TensorCTF[i] = Float32Tensor.Zeros(new long[] { DeviceBatch, 1, BoxDimensions.Y, BoxDimensions.X / 2 + 1 }, DeviceType.CUDA, DeviceID);
                 TensorAngles[i] = Float32Tensor.Zeros(new long[] { DeviceBatch, 3 }, DeviceType.CUDA, DeviceID);
 
@@ -210,6 +213,7 @@ namespace Warp.NNModels
         public void TrainGeneratorParticle(float[] angles,
                                            Image imagesCTF,
                                            Image imagesReal,
+                                           Image imagesnoise,
                                            float learningRate,
                                            out Image prediction,
                                            out Image predictionNoisy,
@@ -230,6 +234,9 @@ namespace Warp.NNModels
                 GPU.CopyDeviceToDevice(imagesReal.GetDeviceSlice(i * DeviceBatch, Intent.Read),
                                        TensorTrueImages[i].DataPtr(),
                                        BoxDimensions.Elements() * DeviceBatch);
+                GPU.CopyDeviceToDevice(imagesnoise.GetDeviceSlice(i * DeviceBatch, Intent.Read),
+                                       TensorNoise[i].DataPtr(),
+                                       BoxDimensions.Elements() * DeviceBatch);
                 GPU.CopyDeviceToDevice(imagesCTF.GetDeviceSlice(i * DeviceBatch, Intent.Read),
                                        TensorCTF[i].DataPtr(),
                                        DeviceBatch * BoxDimensions.ElementsFFT());
@@ -240,7 +247,8 @@ namespace Warp.NNModels
                 using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
                 using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
                 using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
-                using (TorchTensor PredictionNoisy = Generators[i].ApplyNoise(PredictionConv, TensorCTF[i]))
+                //using (TorchTensor PredictionNoisy = Generators[i].ApplyNoise(PredictionConv, TensorCTF[i]))
+                using (TorchTensor PredictionNoisy = PredictionConv.Add(TensorNoise[i]))
                 using (TorchTensor PredictionNoisyMean = doNormalizeInput?PredictionNoisy.Mean(new long[] { 2, 3 }, true):null) 
                 using (TorchTensor PredictionNoisyStd = doNormalizeInput?PredictionNoisy.Std(new long[] { 2, 3 }, true, true):null)
                 using (TorchTensor PredictionNoisyNormalized = doNormalizeInput?(PredictionNoisy - PredictionNoisyMean) /(PredictionNoisyStd + 1e-4): PredictionNoisy)
@@ -286,6 +294,7 @@ namespace Warp.NNModels
         public void TrainDiscriminatorParticle(float[] angles,
                                                Image imagesReal,
                                                Image imagesCTF,
+                                               Image imagesNoise,
                                                float learningRate,
                                                float penaltyLambda,
                                                out Image prediction,
@@ -306,6 +315,9 @@ namespace Warp.NNModels
 
                 GPU.CopyDeviceToDevice(imagesReal.GetDeviceSlice(i * DeviceBatch, Intent.Read),
                                        TensorTrueImages[i].DataPtr(),
+                                       BoxDimensions.Elements() * DeviceBatch);
+                GPU.CopyDeviceToDevice(imagesNoise.GetDeviceSlice(i * DeviceBatch, Intent.Read),
+                                       TensorNoise[i].DataPtr(),
                                        BoxDimensions.Elements() * DeviceBatch);
                 GPU.CopyDeviceToDevice(imagesCTF.GetDeviceSlice(i * DeviceBatch, Intent.Read),
                                        TensorCTF[i].DataPtr(),
@@ -334,7 +346,8 @@ namespace Warp.NNModels
                     using (TorchTensor PredictionFT = Prediction.rfftn(new long[] { 2, 3 }))
                     using (TorchTensor PredictionFTConv = PredictionFT.Mul(TensorCTF[i]))
                     using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
-                    using (TorchTensor PredictionNoisy = Generators[i].ApplyNoise(PredictionConv, TensorCTF[i]))
+                    //using (TorchTensor PredictionNoisy = Generators[i].ApplyNoise(PredictionConv, TensorCTF[i]))
+                    using (TorchTensor PredictionNoisy = PredictionConv.Add(TensorNoise[i]))
                     using (TorchTensor PredictionNoisyMean = doNormalizeInput ? PredictionNoisy.Mean(new long[] { 2, 3 }, true) : null)
                     using (TorchTensor PredictionNoisyStd = doNormalizeInput ? PredictionNoisy.Std(new long[] { 2, 3 }, true, true) : null)
                     using (TorchTensor PredictionNoisyNormalized = doNormalizeInput ? (PredictionNoisy - PredictionNoisyMean) / (PredictionNoisyStd + 1e-4) : null)

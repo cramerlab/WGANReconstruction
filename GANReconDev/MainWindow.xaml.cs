@@ -104,7 +104,7 @@ namespace ParticleWGANDev
         int DiscIters = 5;
         bool TrainGen = true;
 
-        int NThreads = 3;
+        int NThreads = 1;
         int PreProcessingDevice = 1;
         int ProcessingDevice = 0;
         string logFileName = "log.txt";
@@ -129,7 +129,7 @@ namespace ParticleWGANDev
             ButtonStartParticle.IsEnabled = false;
             Task.Run(doTraining, cancellationTokenSourceWindow.Token);
         }
-        private void Close()
+        private void CloseMainwindow()
         {
             cancellationTokenSourceWindow.Cancel();
             Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
@@ -159,6 +159,7 @@ namespace ParticleWGANDev
 
             Image[] ImagesReal = Helper.ArrayOfFunction(i => new Image(new int3(DimGenerator, DimGenerator, BatchSize)), DiscIters + 1);
             Image[] ImagesCTF = Helper.ArrayOfFunction(i => new Image(new int3(DimGenerator, DimGenerator, BatchSize), true), DiscIters + 1);
+            Image[] ImagesNoise = Helper.ArrayOfFunction(i => new Image(new int3(DimGenerator, DimGenerator, BatchSize)), DiscIters + 1);
             float[][] ImagesAngles = Helper.ArrayOfFunction(i => new float[BatchSize * 3], DiscIters + 1);
 
             Semaphore ReloadBlock = new Semaphore(1, 1);
@@ -226,6 +227,7 @@ namespace ParticleWGANDev
                 Image LoadStack = new Image(new int3(DimRaw, DimRaw, BatchSize));
 
                 Image[] TImagesReal = Helper.ArrayOfFunction(i => new Image(new int3(DimGenerator, DimGenerator, BatchSize)), DiscIters + 1);
+                Image[] TImagesNoise = Helper.ArrayOfFunction(i => new Image(new int3(DimGenerator, DimGenerator, BatchSize)), DiscIters + 1);
                 Image[] TImagesCTFFull = Helper.ArrayOfFunction(i => { Image im = new Image(new int3(DimZoom, DimZoom, BatchSize), true); im.Fill(1); return im; }, DiscIters + 1);
                 Image[] TImagesCTFScaled = Helper.ArrayOfFunction(i => { Image im = new Image(new int3(DimGenerator, DimGenerator, BatchSize), true); im.Fill(1); return im; }, DiscIters + 1);
 
@@ -411,9 +413,10 @@ namespace ParticleWGANDev
                             }
                             ColoredNoiseFFT.UpdateHostWithComplex(complexData);
                             Image ColoredNoise = ColoredNoiseFFT.AsIFFT();
-                            
-                                float2 stats = MathHelper.MeanAndStd(ColoredNoise.AsSliceXY(0).GetHostContinuousCopy());
-                            
+                            ColoredNoise.Normalize();
+                            Image NoiseScaled = ColoredNoise.AsScaled(new int2(DimGenerator));
+                            GPU.CopyDeviceToDevice(NoiseScaled.GetDevice(Intent.Read), TImagesNoise[iterTrain].GetDevice(Intent.Write), NoiseScaled.ElementsReal);
+                            NoiseScaled.Dispose();
                             ColoredNoiseFFT.Dispose();
                             projected.Add(ColoredNoise);
                             ColoredNoise.Dispose();
@@ -445,6 +448,7 @@ namespace ParticleWGANDev
                         for (int discIter = 0; discIter < DiscIters + 1; discIter++)
                         {
                             GPU.CopyDeviceToDevice(TImagesReal[discIter].GetDevice(Intent.Read), ImagesReal[discIter].GetDevice(Intent.Write), TImagesReal[discIter].ElementsReal);
+                            GPU.CopyDeviceToDevice(TImagesNoise[discIter].GetDevice(Intent.Read), ImagesNoise[discIter].GetDevice(Intent.Write), ImagesNoise[discIter].ElementsReal);
                             GPU.CopyDeviceToDevice(TImagesCTFScaled[discIter].GetDevice(Intent.Read), ImagesCTF[discIter].GetDevice(Intent.Write), TImagesCTFScaled[discIter].ElementsReal);
                             TImagesAngles[discIter].CopyTo(ImagesAngles[discIter], 0);
                             GPU.CheckGPUExceptions();
@@ -513,7 +517,7 @@ namespace ParticleWGANDev
                     {
                         for (int iterDisc = 0; iterDisc <= DiscIters; iterDisc++)
                         {
-                            TrainModel.TrainGeneratorParticle(ImagesAngles[iterDisc], ImagesCTF[iterDisc], ImagesReal[iterDisc],
+                            TrainModel.TrainGeneratorParticle(ImagesAngles[iterDisc], ImagesCTF[iterDisc], ImagesReal[iterDisc], ImagesNoise[iterDisc],
                               CurrentLearningRate,
                               out PredictionGen,
                               out PredictionGenNoisy,
@@ -524,6 +528,7 @@ namespace ParticleWGANDev
 
                         TrainModel.TrainDiscriminatorParticle(ImagesAngles[DiscIters],
                               ImagesReal[DiscIters],
+                              ImagesNoise[DiscIters],
                               ImagesCTF[DiscIters],
                               CurrentLearningRate,
                               Lambda,
@@ -544,6 +549,7 @@ namespace ParticleWGANDev
 
                             TrainModel.TrainDiscriminatorParticle(ImagesAngles[iterDisc],
                                                                   ImagesReal[iterDisc],
+                                                                  ImagesNoise[iterDisc],
                                                                   ImagesCTF[iterDisc],
                                                                   CurrentLearningRate,
                                                                   Lambda,
@@ -559,7 +565,7 @@ namespace ParticleWGANDev
 
                         if (TrainGen)
                         {
-                            TrainModel.TrainGeneratorParticle(ImagesAngles[DiscIters], ImagesCTF[DiscIters], ImagesReal[DiscIters],
+                            TrainModel.TrainGeneratorParticle(ImagesAngles[DiscIters], ImagesCTF[DiscIters], ImagesReal[DiscIters], ImagesNoise[DiscIters],
                                                               CurrentLearningRate,
                                                               out PredictionGen,
                                                               out PredictionGenNoisy,
@@ -688,7 +694,7 @@ namespace ParticleWGANDev
                         ReloadThreads[i].Join();
                     }
                     //kill this application
-                    Application.Current.Dispatcher.Invoke(() => this.Close());
+                    Application.Current.Dispatcher.Invoke(() => this.CloseMainwindow());
                     return;
                 }
                 _ = ReloadBlock.Release();
@@ -729,7 +735,7 @@ namespace ParticleWGANDev
                 }
             }
         }
-
+        /*
         private void ButtonTest_OnClick_old(object sender, RoutedEventArgs e)
         {
             WriteToLog("Loading model... (" + GPU.GetFreeMemory(0) + " MB free)");
@@ -1015,5 +1021,6 @@ namespace ParticleWGANDev
                 new Star(AllTables.ToArray()).Save(Path.Combine(WorkingDirectory, "ganparticles_std", "particles.star"));
             }
         }
+        */
     }
 }
