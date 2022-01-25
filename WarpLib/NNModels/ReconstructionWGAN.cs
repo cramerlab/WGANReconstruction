@@ -210,7 +210,6 @@ namespace Warp.NNModels
         public void TrainGeneratorParticle(float[] angles,
                                            Image imagesCTF,
                                            Image imagesReal,
-                                           Image imagesNoise,
                                            float learningRate,
                                            out Image prediction,
                                            out Image predictionNoisy,
@@ -274,7 +273,7 @@ namespace Warp.NNModels
             }, null);
 
             GatherGrads();
-            gradNorm = Generators[0].Clip_Gradients(1e3);
+            gradNorm = Generators[0].Clip_Gradients(generator_grad_clip_val);
             OptimizerGen.Step();
             OptimizerGenVolume.Step();
             prediction = ResultPredicted;
@@ -342,7 +341,8 @@ namespace Warp.NNModels
                     using (TorchTensor PredictedInput = doMaskProjections ?
                           (doNormalizeInput ? PredictionNoisyNormalized.Mul(TensorMask[i]) : PredictionConv.Mul(TensorMask[i]))
                         : (doNormalizeInput ? PredictionNoisyNormalized : PredictionConv))
-                    using (TorchTensor IsFakeReal = Discriminators[i].Forward(PredictedInput))
+                    using (TorchTensor PredictedInputDetached = PredictedInput.Detach())
+                    using (TorchTensor IsFakeReal = Discriminators[i].Forward(PredictedInputDetached))
                     using (TorchTensor LossFake = IsFakeReal.Mean())
                     {
                         GPU.CopyDeviceToDevice(PredictedInput.DataPtr(),
@@ -368,7 +368,7 @@ namespace Warp.NNModels
             }, null);
 
             GatherGrads();
-            gradNorm = Discriminators[0].Clip_Gradients(1.0);
+            gradNorm = Discriminators[0].Clip_Gradients(discriminator_grad_clip_val);
             OptimizerDisc.Step();
 
             prediction = ResultPredicted;
