@@ -31,6 +31,7 @@ EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_project(const NNModule mo
 EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_forward_normalized(const NNModule module, const Tensor angles, const Tensor factor);
 EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_apply_noise(const NNModule module, const Tensor fakeimages, const Tensor ctf);
 EXPORT_API(Tensor)   THSNN_ReconstructionWGANGenerator_get_volume(const NNModule module);
+EXPORT_API(void)   THSNN_ReconstructionWGANGenerator_apply_volume_masks(const NNModule module, Tensor binaryMask, Tensor maxMask);
 EXPORT_API(double)   THSNN_ReconstructionWGANGenerator_clip_gradient(const NNModule module, const double clip_Value);
 
 EXPORT_API(NNModule) THSNN_ReconstructionWGANDiscriminator_ctor(NNAnyModule* outAsAnyModule, int64_t boxsize);

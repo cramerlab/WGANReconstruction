@@ -75,6 +75,14 @@ namespace TorchSharp.NN
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new TorchTensor(res);
         }
+        
+        [DllImport("LibTorchSharp")]
+        private static extern void THSNN_ReconstructionWGANGenerator_apply_volume_masks(Module.HType module, IntPtr binaryMask, IntPtr maxMask);
+
+        public void ApplY_Volume_Mask(TorchTensor binaryMask, TorchTensor maxMask)
+        {
+            THSNN_ReconstructionWGANGenerator_apply_volume_masks(handle, binaryMask.Handle, maxMask.Handle);
+        }
 
     }
     public static partial class Modules

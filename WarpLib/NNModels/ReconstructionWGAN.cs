@@ -32,6 +32,8 @@ namespace Warp.NNModels
         private TorchTensor[] TensorMinusOne;
 
         private TorchTensor[] TensorMask;
+        private TorchTensor[] TensorBinaryMask;
+        private TorchTensor[] TensorMaxMask;
         private TorchTensor[] TensorVolumeMask;
 
         private Optimizer OptimizerGen;
@@ -60,7 +62,7 @@ namespace Warp.NNModels
         private bool doMaskProjections = false;
 
         public double SigmaShift { get => sigmaShift; set => sigmaShift = value; }
-
+        public int numGenIt;
         public ReconstructionWGAN(int2 boxDimensions, int[] devices, int batchSize = 8, Image initialVolume = null)
         {
             Devices = devices;
@@ -87,9 +89,12 @@ namespace Warp.NNModels
             TensorMinusOne = new TorchTensor[NDevices];
 
             TensorMask = new TorchTensor[NDevices];
+            TensorBinaryMask = new TorchTensor[NDevices];
+            TensorMaxMask = new TorchTensor[NDevices];
             TensorVolumeMask = new TorchTensor[NDevices];
+            numGenIt = 0;
 
-            
+
 
             Helper.ForCPU(0, NDevices, NDevices, null, (i, threadID) =>
             {
@@ -121,6 +126,44 @@ namespace Warp.NNModels
 
                     Mask.Dispose();
                 }
+                TensorBinaryMask[i] = Float32Tensor.Ones(new long[] { 1, OversampledBoxDimensions.X, OversampledBoxDimensions.Y, OversampledBoxDimensions.X }, DeviceType.CUDA, DeviceID);
+                {
+                    Image Mask = new Image(new int3(OversampledBoxDimensions.X, OversampledBoxDimensions.Y, OversampledBoxDimensions.Y));
+                    double rLim = 0.5*(OversampledBoxDimensions.X / 2.0d + 2.0d * OversampledBoxDimensions.X / 8.0d);
+                    Mask.TransformValues((x, y, z, val) =>
+                    {
+                        double xx = Math.Pow(x -OversampledBoxDimensions.X / 2.0d, 2);
+                        double yy = Math.Pow(y -OversampledBoxDimensions.X / 2.0d, 2);
+                        double zz = Math.Pow(z- OversampledBoxDimensions.X / 2.0d, 2);
+                        double r = Math.Sqrt(xx + yy + zz);
+
+                        return (float)(r>rLim?0:1);
+                    });
+                    Mask.WriteMRC("BinaryMask.mrc", true);
+                    GPU.CopyDeviceToDevice(Mask.GetDevice(Intent.Read), TensorBinaryMask[i].DataPtr(), Mask.ElementsReal);
+
+                    Mask.Dispose();
+                }
+
+                TensorMaxMask[i] = Float32Tensor.Ones(new long[] { 1, OversampledBoxDimensions.X, OversampledBoxDimensions.Y, OversampledBoxDimensions.X }, DeviceType.CUDA, DeviceID);
+                {
+                    Image Mask = new Image(new int3(OversampledBoxDimensions.X, OversampledBoxDimensions.Y, OversampledBoxDimensions.Y));
+                    double rLim = 0.5*(OversampledBoxDimensions.X / 2.0d + 2.0d * OversampledBoxDimensions.X / 8.0d);
+                    Mask.TransformValues((x, y, z, val) => 
+                    {
+                        double xx = Math.Pow(x - OversampledBoxDimensions.X / 2.0d, 2);
+                        double yy = Math.Pow(y- OversampledBoxDimensions.X / 2.0d, 2);
+                        double zz = Math.Pow(z -OversampledBoxDimensions.X / 2.0d, 2);
+                        double r = Math.Sqrt(xx + yy + zz);
+
+                        return (float)(r<rLim?1 - r / rLim:0); 
+                    });
+                    Mask.WriteMRC("TensorMaxMask.mrc", true);
+                    GPU.CopyDeviceToDevice(Mask.GetDevice(Intent.Read), TensorMaxMask[i].DataPtr(), Mask.ElementsReal);
+
+                    Mask.Dispose();
+                }
+
                 TensorVolumeMask[i] = Float32Tensor.Ones(new long[] { 1, OversampledBoxDimensions.X, OversampledBoxDimensions.Y, OversampledBoxDimensions.X }, DeviceType.CUDA, DeviceID);
                 {
                     Image Mask = new Image(new int3(OversampledBoxDimensions.X, OversampledBoxDimensions.Y, OversampledBoxDimensions.X));
@@ -281,7 +324,7 @@ namespace Warp.NNModels
             }, null);
 
             GatherGrads();
-            gradNorm = Generators[0].Clip_Gradients(1e3);
+            gradNorm = Generators[0].Clip_Gradients(generator_grad_clip_val);
             OptimizerGen.Step();
             OptimizerGenVolume.Step();
             prediction = ResultPredicted;
@@ -289,6 +332,12 @@ namespace Warp.NNModels
             predictionNoisy = ResultPredictedNoisy;
             predictionNoisy.FreeDevice();
             loss = ResultLoss;
+            using (TorchTensor thisMaxMask = TensorMaxMask[0].Mul(Math.Min(numGenIt, 100)/100.0))
+            { 
+                Generators[0].ApplY_Volume_Mask(TensorBinaryMask[0], thisMaxMask); 
+            }
+            
+            numGenIt++;
         }
 
         public void TrainDiscriminatorParticle(float[] angles,
@@ -354,6 +403,7 @@ namespace Warp.NNModels
                     using (TorchTensor PredictedInput = doMaskProjections ?
                           (doNormalizeInput ? PredictionNoisyNormalized.Mul(TensorMask[i]) : PredictionConv.Mul(TensorMask[i]))
                         : (doNormalizeInput ? PredictionNoisyNormalized : PredictionConv))
+                    using (TorchTensor PredictedInputDetached = PredictedInput.Detach())
                     using (TorchTensor IsFakeReal = Discriminators[i].Forward(PredictedInput))
                     using (TorchTensor LossFake = IsFakeReal.Mean())
                     {
@@ -380,7 +430,7 @@ namespace Warp.NNModels
             }, null);
 
             GatherGrads();
-            gradNorm = Discriminators[0].Clip_Gradients(1.0);
+            gradNorm = Discriminators[0].Clip_Gradients(discriminator_grad_clip_val);
             OptimizerDisc.Step();
 
             prediction = ResultPredicted;

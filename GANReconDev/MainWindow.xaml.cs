@@ -527,9 +527,9 @@ namespace ParticleWGANDev
                         }
 
                         TrainModel.TrainDiscriminatorParticle(ImagesAngles[DiscIters],
-                              ImagesReal[DiscIters],
-                              ImagesNoise[DiscIters],
+                              ImagesReal[DiscIters],                              
                               ImagesCTF[DiscIters],
+                              ImagesNoise[DiscIters],
                               CurrentLearningRate,
                               Lambda,
                               out PredictionDisc,
@@ -548,9 +548,9 @@ namespace ParticleWGANDev
                         {
 
                             TrainModel.TrainDiscriminatorParticle(ImagesAngles[iterDisc],
-                                                                  ImagesReal[iterDisc],
-                                                                  ImagesNoise[iterDisc],
+                                                                  ImagesReal[iterDisc],                                                                  
                                                                   ImagesCTF[iterDisc],
+                                                                  ImagesNoise[iterDisc],
                                                                   CurrentLearningRate,
                                                                   Lambda,
                                                                   out PredictionDisc,

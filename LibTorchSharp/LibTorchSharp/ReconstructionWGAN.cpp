@@ -218,6 +218,16 @@ struct ReconstructionWGANGeneratorImpl : MultiGPUModule
         }
     }
 
+    void apply_volume_masks(torch::Tensor binaryMask, torch::Tensor maxMask) {
+        auto dimsBinMask = binaryMask.sizes().vec();
+        auto dimsMaxMask = maxMask.sizes().vec();
+        auto dims_volume = _volume.sizes().vec();
+        torch::Tensor maskedVol = _volume.mul(binaryMask);
+        maskedVol = maskedVol.maximum(-0.02*maskedVol.max() * maxMask);
+        _volume.set_data(maskedVol);
+        auto dims_volume_two = _volume.sizes().vec();
+
+    }
 
     torch::Tensor forward(torch::Tensor angles, bool do_shift)
     {
@@ -673,6 +683,10 @@ Tensor THSNN_ReconstructionWGANGenerator_apply_noise(const NNModule module, cons
 Tensor THSNN_ReconstructionWGANGenerator_get_volume(const NNModule module)
 {
     CATCH_TENSOR((*module)->as<ReconstructionWGANGeneratorImpl>()->get_Volume());
+}
+void THSNN_ReconstructionWGANGenerator_apply_volume_masks(const NNModule module, Tensor binaryMask, Tensor maxMask)
+{
+    (*module)->as<ReconstructionWGANGeneratorImpl>()->apply_volume_masks(*binaryMask, *maxMask);
 }
 
 
