@@ -13,6 +13,9 @@ using static TorchSharp.NN.Losses;
 using static TorchSharp.ScalarExtensionMethods;
 using TorchSharp;
 using System.Diagnostics;
+using System.IO;
+using Warp.Headers;
+using System.Globalization;
 
 namespace TestCustomOperators
 {
@@ -873,9 +876,482 @@ namespace TestCustomOperators
             }
         }
 
+
+        private static float getGaussian(Random rand, double mu, double sigma)
+        {
+            double u1 = 1.0 - rand.NextDouble(); //uniform(0,1] random doubles
+            double u2 = 1.0 - rand.NextDouble();
+            double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) *
+                         Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
+            return (float)(mu + sigma * randStdNormal);
+        }
+
+        private static void TestReconstructionFromRealProjections()
+        {
+            int seed = 42;
+            int device = 0;
+            //int DimGenerator = 64;
+            int DimGenerator = 128;
+            int DimZoom = 128;
+            int BatchSize = 512*16;
+            double sigmaShiftPix = 2.0;
+            string WorkingDirectory = @"D:\GAN_recon_polcompl\";
+            string OutDirectory = @"D:\GAN_recon_polcompl\reconstructionTestExperimental";
+            string outFileName = $@"{OutDirectory}\fscValues.txt";
+            if (!Directory.Exists(OutDirectory))
+            {
+                Directory.CreateDirectory(OutDirectory);
+            }
+            using (var dump = new StreamWriter(outFileName, false))
+            {
+            }
+
+
+            GPU.SetDevice(device);
+
+            Star TableIn = new Star(Path.Combine(WorkingDirectory, "run_data.star"), "particles");
+            TableIn.AddColumn("rlnVoltage", "200.0");
+            TableIn.AddColumn("rlnSphericalAberration", "2.7");
+            TableIn.AddColumn("rlnAmplitudeContrast", "0.07");
+            TableIn.AddColumn("rlnDetectorPixelSize", "3.0");
+            TableIn.AddColumn("rlnMagnification", "10000");
+
+            Random rand = new Random(seed);
+
+            string[] ColumnStackNames = TableIn.GetColumn("rlnImageName").Select(s => Helper.PathToNameWithExtension(s.Substring(s.IndexOf('@') + 1))).ToArray();
+            HashSet<string> UniqueStackNames = Helper.GetUniqueElements(ColumnStackNames);
+
+
+            int DimRaw = MapHeader.ReadFromFile(Path.Combine(WorkingDirectory, "Refine3D_CryoSparcSelected_run_class001.mrc")).Dimensions.X;
+
+            var AllParticleAddresses = new (int id, string name)[TableIn.RowCount];
+            {
+                ColumnStackNames = TableIn.GetColumn("rlnImageName");
+                for (int r = 0; r < TableIn.RowCount; r++)
+                {
+                    string s = ColumnStackNames[r];
+                    int ID = int.Parse(s.Substring(0, s.IndexOf('@'))) - 1;
+                    string Name = Helper.PathToNameWithExtension(s.Substring(s.IndexOf('@') + 1));
+                    AllParticleAddresses[r] = (ID, Name);
+                }
+            }
+            int[] AllIDs = Helper.ArrayOfSequence(0, AllParticleAddresses.Length, 1);
+
+            CTF[] AllParticleCTF = TableIn.GetRelionCTF();
+            float3[] AllParticleAngles = TableIn.GetRelionAngles().Select(s => s * Helper.ToRad).ToArray();
+            float3[] AllParticleAnglesDeg = TableIn.GetRelionAngles();
+            float3[] AllParticleShifts = TableIn.GetRelionOffsets().Select(s => s / 3.0f).ToArray();
+
+            Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "Refine3D_CryoSparcSelected_run_class001.mrc"));
+            if (DimZoom != DimRaw)
+                TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - DimZoom) / 2), new int3(DimZoom));
+            Image RefVolumeScaled;
+            if (DimGenerator < DimZoom)
+                RefVolumeScaled = TrefVolume.AsScaled(new int3(DimGenerator));
+            else
+                RefVolumeScaled = TrefVolume;
+
+
+            Random ReloadRand = new Random(seed);
+
+
+            Image ParticleStack = new Image(new int3(DimRaw, DimRaw, BatchSize));
+
+            Image CTFFull = new Image(new int3(DimZoom, DimZoom, BatchSize), true);
+            CTFFull.Fill(1);
+            Image CTFScaled = new Image(new int3(DimGenerator, DimGenerator, BatchSize), true);
+            CTFScaled.Fill(1);
+
+            Image CTFCoordsFull = CTF.GetCTFCoords(DimZoom, DimZoom);
+            Image CTFCoordsScaled = CTF.GetCTFCoords(DimGenerator, DimZoom);
+            float2[][] scaledCoords = CTFCoordsScaled.GetHostComplexCopy();
+            float2[][] FullCoords = CTFCoordsFull.GetHostComplexCopy();
+
+
+
+            {
+                // If this thread succeeded at pushing its previously loaded batch to processing
+                Projector Reconstructor = new(new int3(DimGenerator), 2);
+                for (int iter = 0; (iter+1)*BatchSize < AllParticleAngles.Length; iter++)
+                {
+                    int[] SubsetIDs = Helper.RandomSubset(AllIDs, BatchSize, ReloadRand.Next());
+                    int[] currentSubset = Helper.ArrayOfSequence(iter * BatchSize, (iter + 1) * BatchSize, 1);
+
+                    float3[] theseAngles = Helper.IndexedSubset(AllParticleAngles, SubsetIDs);
+                    float3[] theseShifts = Helper.IndexedSubset(AllParticleShifts, SubsetIDs);
+
+                    // Read, and copy or rescale real and fake images from prepared stacks
+                    float[][] ParticleStackData = ParticleStack.GetHost(Intent.Write);
+                    //Helper.ForCPU(0, BatchSize, 3, null, (b,threadID) =>
+                    for (int b = 0; b < BatchSize; b++)
+                    {
+                        int id = SubsetIDs[b];
+                        IOHelper.ReadMapFloat(Path.Combine(WorkingDirectory, "particles", AllParticleAddresses[id].name),
+                                                new int2(1),
+                                                0,
+                                                typeof(float),
+                                                new[] { AllParticleAddresses[id].id },
+                                                null,
+                                                new[] { ParticleStackData[b] });
+                    }//, null);
+
+                    GPU.Normalize(ParticleStack.GetDevice(Intent.Read),
+                        ParticleStack.GetDevice(Intent.Write),
+                        (uint)ParticleStack.ElementsSliceReal,
+                        (uint)BatchSize);
+                    ParticleStack.ShiftSlices(theseShifts);
+
+                    var theseCTF = Helper.IndexedSubset(AllParticleCTF, SubsetIDs).Select(c => c.ToStruct()).ToArray();
+                    GPU.CreateCTF(CTFFull.GetDevice(Intent.Write),
+                                  CTFCoordsFull.GetDevice(Intent.Read),
+                                  IntPtr.Zero,
+                                  (uint)CTFCoordsFull.ElementsSliceComplex,
+                                  theseCTF,
+                                  false,
+                                  (uint)BatchSize);
+                    GPU.CreateCTF(CTFScaled.GetDevice(Intent.Write),
+                      CTFCoordsScaled.GetDevice(Intent.Read),
+                      IntPtr.Zero,
+                      (uint)CTFCoordsScaled.ElementsSliceComplex,
+                      theseCTF,
+                      false,
+                      (uint)BatchSize);
+
+
+                    {
+                        Image fft = ParticleStack.AsFFT();
+                        ParticleStack.Dispose();
+                        fft.Multiply(CTFFull);
+                        ParticleStack = fft.AsIFFT(false, 0, true);
+                        fft.Dispose();
+                    }
+                    CTFScaled.Multiply(CTFScaled);
+                    CTFFull.Multiply(CTFFull);
+
+                    //CTFScaled.WriteMRC(@$"{OutDirectory}\CTFScaled_{iter}.mrc", true);
+
+                    Image projectedScaled;
+                    if (DimGenerator < DimZoom)
+                        projectedScaled = ParticleStack.AsScaled(new int2(DimGenerator));
+                    else
+                        projectedScaled = ParticleStack.GetCopy();
+
+                    //projectedScaled.WriteMRC(@$"{OutDirectory}\projectedScaled_{iter}.mrc", true);
+
+                    Image projectedScaledFFT = projectedScaled.AsFFT(false);
+                    projectedScaledFFT.ShiftSlices(Helper.ArrayOfFunction(i => new float3(projectedScaled.Dims.X / 2, projectedScaled.Dims.Y / 2, 0), BatchSize));
+                    projectedScaled.Dispose();
+
+
+                    Reconstructor.BackProject(projectedScaledFFT, CTFScaled, theseAngles, new float3(1, 1, 0));
+                    projectedScaledFFT.Dispose();
+
+                    Image reconstruction = Reconstructor.Reconstruct(false);
+                    reconstruction.WriteMRC($@"{OutDirectory}\Reconstruction_{iter}.mrc", true);
+
+                    
+                    float[] fsc = FSC.GetFSC(reconstruction, RefVolumeScaled);
+                    using (StreamWriter w = File.AppendText(outFileName))
+                    {
+                        for (int i = 0; i < fsc.Length; i++)
+                        {
+                            w.WriteLine($"{iter}\t{DimGenerator * (3.0) / (i + 1)}\t{fsc[i]}");
+                        }
+
+                    }
+                    reconstruction.Dispose();
+
+                }
+            }
+        }
+
+
+
+        private static void TestReconstructionFromArtificialProjections()
+        {
+            int seed = 42;
+            int device = 0;
+            int DimGenerator = 64;
+            int DimZoom = 128;
+            int BatchSize = 512;
+            double sigmaShiftPix = 2.0;
+            string WorkingDirectory = @"D:\GAN_recon_polcompl\";
+            string OutDirectory = @"D:\GAN_recon_polcompl\reconstructionTest";
+            string outFileName = $@"{OutDirectory}\fscValues.txt";
+            if (!Directory.Exists(OutDirectory))
+            {
+                Directory.CreateDirectory(OutDirectory);
+            }
+            using (var dump = File.OpenWrite(outFileName))
+            { 
+            }
+
+
+            Torch.SetSeed(seed);
+
+            GPU.SetDevice(device);
+
+            Star TableIn = new Star(Path.Combine(WorkingDirectory, "cryosparc_P243_J525_003_particles.star"));
+
+            Random rand = new Random(seed);
+
+            string[] ColumnStackNames = TableIn.GetColumn("rlnImageName").Select(s => Helper.PathToNameWithExtension(s.Substring(s.IndexOf('@') + 1))).ToArray();
+            HashSet<string> UniqueStackNames = Helper.GetUniqueElements(ColumnStackNames);
+
+
+            int DimRaw = MapHeader.ReadFromFile(Path.Combine(WorkingDirectory, "Refine3D_CryoSparcSelected_run_class001.mrc")).Dimensions.X;
+
+            var AllParticleAddresses = new (int id, string name)[TableIn.RowCount];
+
+            int[] AllIDs = Helper.ArrayOfSequence(0, AllParticleAddresses.Length, 1);
+
+            CTF[] AllParticleCTF = TableIn.GetRelionCTF();
+            float3[] AllParticleAngles = TableIn.GetRelionAngles().Select(s => s * Helper.ToRad).ToArray();
+
+            float3[] RandomParticleAngles = Helper.GetHealpixAngles(3).Select(s => s * Helper.ToRad).ToArray();
+
+            int numParticles = RandomParticleAngles.Length;
+
+            string starFileName = @$"{WorkingDirectory}\run_model.star";
+            float[][] AllSigmas = Helper.ArrayOfFunction(i =>
+            {
+                Star table = new(starFileName, $"model_group_{i + 1}");
+                string[] column = table.GetColumn("rlnSigma2Noise");
+                float[] entries = column.Select(s => (float)Math.Sqrt(float.Parse(s, NumberStyles.Float, CultureInfo.InvariantCulture))).ToArray();
+                return entries;
+            }, 1);
+
+            Image cleanProjection;
+            {
+                Image RefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "Refine3D_CryoSparcSelected_run_class001.mrc"));
+                if (DimZoom != DimRaw)
+                    RefVolume = RefVolume.AsRegion(new int3((DimRaw - DimZoom) / 2), new int3(DimZoom));
+                Projector CleanProj = new Projector(RefVolume, 2);
+                Image projected = CleanProj.ProjectToRealspace(new int2(DimZoom), new float3[] { new float3(0) });
+                cleanProjection = projected.AsScaled(new int2(DimGenerator));
+                cleanProjection.Normalize();
+                cleanProjection.MaskSpherically(DimGenerator / 2, DimGenerator / 8, false);
+
+                cleanProjection.FreeDevice();
+                CleanProj.Dispose();
+
+            }
+
+            Image TrefVolume = Image.FromFile(Path.Combine(WorkingDirectory, "Refine3D_CryoSparcSelected_run_class001.mrc"));
+            if (DimZoom != DimRaw)
+                TrefVolume = TrefVolume.AsRegion(new int3((DimRaw - DimZoom) / 2), new int3(DimZoom));
+            Image RefVolumeScaled = TrefVolume.AsScaled(new int3(DimGenerator));
+            Projector TProj = new Projector(TrefVolume, 2);
+
+            Random ReloadRand = new Random(seed);
+            RandomNormal NoiseRand = new RandomNormal(seed);
+            Random ShiftRand = new Random(seed);
+            Random sigmaPicker = new Random(seed);
+
+            Image LoadStack = new Image(new int3(DimRaw, DimRaw, BatchSize));
+
+            Image TImagesReal = new Image(new int3(DimGenerator, DimGenerator, BatchSize));
+            Image TImagesNoise = new Image(new int3(DimGenerator, DimGenerator, BatchSize));
+            Image CTFFull = new Image(new int3(DimZoom, DimZoom, BatchSize), true);
+            CTFFull.Fill(1);
+            Image CTFScaled = new Image(new int3(DimGenerator, DimGenerator, BatchSize), true);
+            CTFScaled.Fill(1);
+
+            Image CTFCoordsFull = CTF.GetCTFCoords(DimZoom, DimZoom);
+            Image CTFCoordsScaled = CTF.GetCTFCoords(DimGenerator, DimZoom);
+            float2[][] scaledCoords = CTFCoordsScaled.GetHostComplexCopy();
+            float2[][] FullCoords = CTFCoordsFull.GetHostComplexCopy();
+
+            Image CTFMaskFull = new Image(new int3(DimZoom, DimZoom, BatchSize), true);
+            CTFMaskFull.Fill(1);
+            CTFMaskFull.TransformValues((x, y, z, val) =>
+            {
+                float nyquistsoftedge = 0.05f;
+                float yy = y >= CTFMaskFull.Dims.Y / 2 + 1 ? y - CTFMaskFull.Dims.Y : y;
+                yy /= CTFMaskFull.Dims.Y / 2.0f;
+                yy *= yy;
+
+                float xx = x;
+                xx /= CTFMaskFull.Dims.X / 2.0f;
+                xx *= xx;
+
+                float r = (float)Math.Sqrt(xx + yy);
+                float filter = 1;
+                if (nyquistsoftedge > 0)
+                {
+                    float edgelow = (float)Math.Cos(Math.Min(1, Math.Max(0, 0 - r) / nyquistsoftedge) * Math.PI) * 0.5f + 0.5f;
+                    float edgehigh = (float)Math.Cos(Math.Min(1, Math.Max(0, (r - 1) / nyquistsoftedge)) * Math.PI) * 0.5f + 0.5f;
+                    filter = edgelow * edgehigh;
+                }
+                else
+                {
+                    filter = (r is >= 0 and <= 1) ? 1 : 0;
+                }
+
+                return val * filter;
+            });
+
+            Image CTFMaskScaled = new Image(new int3(DimGenerator, DimGenerator, BatchSize), true);
+            CTFMaskScaled.Fill(1);
+            CTFMaskScaled.TransformValues((x, y, z, val) =>
+            {
+                float nyquistsoftedge = 0.05f;
+                float yy = y >= CTFMaskScaled.Dims.Y / 2 + 1 ? y - CTFMaskScaled.Dims.Y : y;
+                yy /= CTFMaskScaled.Dims.Y / 2.0f;
+                yy *= yy;
+
+
+                float xx = x;
+                xx /= CTFMaskScaled.Dims.X / 2.0f;
+                xx *= xx;
+
+                float r = (float)Math.Sqrt(xx + yy);
+
+                float filter = 1;
+                if (nyquistsoftedge > 0)
+                {
+                    float edgelow = (float)Math.Cos(Math.Min(1, Math.Max(0, 0 - r) / nyquistsoftedge) * Math.PI) * 0.5f + 0.5f;
+                    float edgehigh = (float)Math.Cos(Math.Min(1, Math.Max(0, (r - 1) / nyquistsoftedge)) * Math.PI) * 0.5f + 0.5f;
+                    filter = edgelow * edgehigh;
+                }
+                else
+                {
+                    filter = (r is >= 0 and <= 1) ? 1 : 0;
+                }
+
+                return val * filter;
+            });
+
+            {
+                // If this thread succeeded at pushing its previously loaded batch to processing
+                Projector Reconstructor = new(new int3(DimGenerator), 2);
+                for (int iter = 0; iter < 100; iter++)
+                {
+                    int[] SubsetIDs = Helper.RandomSubset(AllIDs, BatchSize, ReloadRand.Next());
+                    int[] AngleIds = Helper.ArrayOfFunction(i => ReloadRand.Next(0, RandomParticleAngles.Length), BatchSize);
+                    int[] SigmaIds = Helper.ArrayOfFunction(i => sigmaPicker.Next(0, AllSigmas.Length), BatchSize);
+
+                    // Read, and copy or rescale real and fake images from prepared stacks
+
+                    float3[] theseAngles = Helper.IndexedSubset(RandomParticleAngles, AngleIds);
+                    //theseAngles = Helper.ArrayOfFunction(i => new float3(0, 0, 0), AngleIds.Length);
+                    float[][] theseSigmas = Helper.IndexedSubset(AllSigmas, SigmaIds);
+
+                    Image projected = TProj.ProjectToRealspace(new int2(DimZoom), theseAngles);
+
+                    GPU.CheckGPUExceptions();
+                    var theseCTF = Helper.IndexedSubset(AllParticleCTF, SubsetIDs).Select(c => c.ToStruct()).ToArray();
+                    GPU.CreateCTF(CTFFull.GetDevice(Intent.Write),
+                                  CTFCoordsFull.GetDevice(Intent.Read),
+                                  IntPtr.Zero,
+                                  (uint)CTFCoordsFull.ElementsSliceComplex,
+                                  theseCTF,
+                                  false,
+                                  (uint)BatchSize);
+                    GPU.CreateCTF(CTFScaled.GetDevice(Intent.Write),
+                      CTFCoordsScaled.GetDevice(Intent.Read),
+                      IntPtr.Zero,
+                      (uint)CTFCoordsScaled.ElementsSliceComplex,
+                      theseCTF,
+                      false,
+                      (uint)BatchSize);
+
+                    {
+                        Image thisCTFSign = CTFFull.GetCopy();
+                        thisCTFSign.Sign();
+                        CTFFull.Multiply(thisCTFSign);
+                        CTFFull.Multiply(CTFMaskFull);
+                        thisCTFSign.Dispose();
+                    }
+                    {
+                        Image thisCTFSign = CTFScaled.GetCopy();
+                        thisCTFSign.Sign();
+                        CTFScaled.Multiply(thisCTFSign);
+                        CTFScaled.Multiply(CTFMaskScaled);
+                        thisCTFSign.Dispose();
+                    }
+
+                    CTFFull.Fill(1);
+                    CTFScaled.Fill(1);
+                    {
+                        Image fft = projected.AsFFT();
+                        projected.Dispose();
+                        fft.Multiply(CTFFull);
+                        projected = fft.AsIFFT(false, 0, true);
+                        fft.Dispose();
+                    }
+
+                    Image ColoredNoiseFFT = new Image(projected.Dims, true, true);
+                    float2[][] complexData = Helper.ArrayOfFunction(i => new float2[projected.DimsFTSlice.Elements()], projected.Dims.Z);
+                    for (int z = 0; z < projected.Dims.Z; z++)
+                    {
+                        for (int y = 0; y < projected.Dims.Y; y++)
+                        {
+                            for (int x = 0; x < projected.Dims.X / 2 + 1; x++)
+                            {
+                                float yy = y >= projected.Dims.Y / 2 + 1 ? y - projected.Dims.Y : y;
+                                yy *= yy;
+
+                                float xx = x;
+                                xx *= xx;
+
+                                float r = (float)Math.Sqrt(xx + yy);
+                                int waveNumber = (int)Math.Round(r);
+                                waveNumber = Math.Min(waveNumber, projected.Dims.X / 2);
+                                complexData[z][y * (projected.Dims.X / 2 + 1) + x] = new float2(NoiseRand.NextSingle(0, theseSigmas[z][waveNumber]), NoiseRand.NextSingle(0, theseSigmas[z][waveNumber]));
+
+                            }
+                        }
+                    }
+                    ColoredNoiseFFT.UpdateHostWithComplex(complexData);
+                    Image ColoredNoise = ColoredNoiseFFT.AsIFFT();
+                    ColoredNoise.Normalize();
+                    Image NoiseScaled = ColoredNoise.AsScaled(new int2(DimGenerator));
+                    GPU.CopyDeviceToDevice(NoiseScaled.GetDevice(Intent.Read), TImagesNoise.GetDevice(Intent.Write), NoiseScaled.ElementsReal);
+                    NoiseScaled.Dispose();
+                    ColoredNoiseFFT.Dispose();
+                    projected.Add(ColoredNoise);
+                    ColoredNoise.Dispose();
+
+                    Image projectedScaled = projected.AsScaled(new int2(DimGenerator));
+                    projectedScaled.Bandpass(0, 1.0f, false, 0.05f);
+                    projected.Dispose();
+                    Image projectedScaledFFT = projectedScaled.AsFFT(false);
+                    
+                    projectedScaledFFT.ShiftSlices(Helper.ArrayOfFunction(i => new float3(projectedScaled.Dims.X / 2, projectedScaled.Dims.Y / 2, 0), BatchSize));
+                    projectedScaled.WriteMRC(@$"{OutDirectory}\projectedScaled_{iter}.mrc", true);
+                    projectedScaled.Dispose();
+                    Reconstructor.BackProject(projectedScaledFFT, CTFScaled, theseAngles, new float3(1, 1, 0));
+                    Image reconstruction = Reconstructor.Reconstruct(false);
+                    reconstruction.WriteMRC($@"{OutDirectory}\Reconstruction_{iter}.mrc", true);
+                    
+                    projectedScaledFFT.Dispose();
+                    float[] fsc = FSC.GetFSC(reconstruction, RefVolumeScaled);
+                    using (StreamWriter w = File.AppendText(outFileName))
+                    {
+                        for (int i = 0; i < fsc.Length; i++)
+                        {
+                            w.WriteLine($"{iter}\t{DimGenerator * (6) / (i+1)}\t{fsc[i]}");
+                        }
+                        
+                    }
+                    reconstruction.Dispose();
+
+                }
+            }
+        }
+        
+           
         static void Main(string[] args)
         {
-            TestGridSampleAndProject();
+            /*
+            Image im = Image.FromFile(@"Z:\DATA\fjochhe\6yyt_molmap\6yyt_map_3A.mrc");
+            im = im.AsPadded(new int3(256));
+            im.WriteMRC(@"Z:\DATA\fjochhe\6yyt_molmap\6yyt_map_3A_new.mrc",true);
+            im.AsScaled(new int3(128)).WriteMRC(@"Z:\DATA\fjochhe\6yyt_molmap\6yyt_map_6A.mrc", true);
+            */
+            TestReconstructionFromRealProjections();
+            //TestGridSampleAndProject();
         }
     }
 }

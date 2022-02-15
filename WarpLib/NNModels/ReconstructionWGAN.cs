@@ -35,12 +35,14 @@ namespace Warp.NNModels
         private TorchTensor[] TensorBinaryMask;
         private TorchTensor[] TensorMaxMask;
         private TorchTensor[] TensorVolumeMask;
+        private TorchTensor[] TensorGaussian;
 
         private Optimizer OptimizerGen;
         private Optimizer OptimizerGenVolume;
         private Optimizer OptimizerDisc;
 
-        private Image ResultPredicted;
+        private Image ResultPredictedGen;
+        private Image ResultPredictedDisc;
         private Image ResultPredictedNoisy;
         private float[] ResultLoss = new float[1];
         private float[] ResultLossDiscReal = new float[1];
@@ -51,7 +53,7 @@ namespace Warp.NNModels
         private bool IsDisposed = false;
         private bool doShift = false;
 
-        private double GenVolumeBoost = 10;
+        private double GenVolumeBoost = 1;
         private double GenBoost = 1;
         private double generator_grad_clip_val = 1e4f;
         private double discriminator_grad_clip_val = 1e8f;
@@ -63,7 +65,7 @@ namespace Warp.NNModels
 
         public double SigmaShift { get => sigmaShift; set => sigmaShift = value; }
         public int numGenIt;
-        public ReconstructionWGAN(int2 boxDimensions, int[] devices, int batchSize = 8, Image initialVolume = null)
+        public ReconstructionWGAN(int2 boxDimensions, int[] devices, int batchSize = 8, Image discriminatorImage=null, Image initialVolume = null)
         {
             Devices = devices;
             NDevices = Devices.Length;
@@ -74,12 +76,13 @@ namespace Warp.NNModels
                 throw new Exception("Batch size must be divisible by the number of devices.");
 
             BoxDimensions = boxDimensions;
-            OversampledBoxDimensions = new(128);// boxDimensions*4;//boxDimensions*2;
+            OversampledBoxDimensions = new(boxDimensions);// boxDimensions*4;//boxDimensions*2;
 
             Generators = new ReconstructionWGANGenerator[NDevices];
             Discriminators = new ReconstructionWGANDiscriminator[NDevices];
 
             TensorTrueImages = new TorchTensor[NDevices];
+            TensorGaussian = new TorchTensor[NDevices];
             TensorFakeImages = new TorchTensor[NDevices];
             TensorCTF = new TorchTensor[NDevices];
             TensorNoise = new TorchTensor[NDevices];
@@ -94,17 +97,17 @@ namespace Warp.NNModels
             TensorVolumeMask = new TorchTensor[NDevices];
             numGenIt = 0;
 
-
-
             Helper.ForCPU(0, NDevices, NDevices, null, (i, threadID) =>
             {
                 int DeviceID = Devices[i];
 
-
-                Discriminators[i] = ReconstructionWGANDiscriminator(boxDimensions.X);
+                TorchTensor discrimIm = Float32Tensor.Empty(new long[] { 1, discriminatorImage.Dims.Z, discriminatorImage.Dims.Y, discriminatorImage.Dims.X }, DeviceType.CUDA, DeviceID);
+                GPU.CopyDeviceToDevice(discriminatorImage.GetDevice(Intent.Read), discrimIm.DataPtr(), discriminatorImage.ElementsReal);
+                Discriminators[i] = ReconstructionWGANDiscriminator(boxDimensions.X, doNormalizeInput);
                 Discriminators[i].ToCuda(DeviceID);
 
                 TensorTrueImages[i] = Float32Tensor.Zeros(new long[] { DeviceBatch, 1, BoxDimensions.Y, BoxDimensions.X }, DeviceType.CUDA, DeviceID);
+                TensorGaussian[i] = Float32Tensor.Zeros(new long[] { 1, 1, BoxDimensions.Y, BoxDimensions.X }, DeviceType.CUDA, DeviceID);
                 TensorFakeImages[i] = Float32Tensor.Zeros(new long[] { DeviceBatch, 1, BoxDimensions.Y, BoxDimensions.X }, DeviceType.CUDA, DeviceID);
                 TensorNoise[i] = Float32Tensor.Zeros(new long[] { DeviceBatch, 1, BoxDimensions.Y, BoxDimensions.X }, DeviceType.CUDA, DeviceID);
                 TensorCTF[i] = Float32Tensor.Zeros(new long[] { DeviceBatch, 1, BoxDimensions.Y, BoxDimensions.X / 2 + 1 }, DeviceType.CUDA, DeviceID);
@@ -129,7 +132,7 @@ namespace Warp.NNModels
                 TensorBinaryMask[i] = Float32Tensor.Ones(new long[] { 1, OversampledBoxDimensions.X, OversampledBoxDimensions.Y, OversampledBoxDimensions.X }, DeviceType.CUDA, DeviceID);
                 {
                     Image Mask = new Image(new int3(OversampledBoxDimensions.X, OversampledBoxDimensions.Y, OversampledBoxDimensions.Y));
-                    double rLim = 0.5*(OversampledBoxDimensions.X / 2.0d + 2.0d * OversampledBoxDimensions.X / 8.0d);
+                    double rLim = OversampledBoxDimensions.X/2;// 0.5 *(OversampledBoxDimensions.X / 2.0d + 2.0d * OversampledBoxDimensions.X / 8.0d);
                     Mask.TransformValues((x, y, z, val) =>
                     {
                         double xx = Math.Pow(x -OversampledBoxDimensions.X / 2.0d, 2);
@@ -139,7 +142,7 @@ namespace Warp.NNModels
 
                         return (float)(r>rLim?0:1);
                     });
-                    Mask.WriteMRC("BinaryMask.mrc", true);
+                    //Mask.WriteMRC("BinaryMask.mrc", true);
                     GPU.CopyDeviceToDevice(Mask.GetDevice(Intent.Read), TensorBinaryMask[i].DataPtr(), Mask.ElementsReal);
 
                     Mask.Dispose();
@@ -148,7 +151,7 @@ namespace Warp.NNModels
                 TensorMaxMask[i] = Float32Tensor.Ones(new long[] { 1, OversampledBoxDimensions.X, OversampledBoxDimensions.Y, OversampledBoxDimensions.X }, DeviceType.CUDA, DeviceID);
                 {
                     Image Mask = new Image(new int3(OversampledBoxDimensions.X, OversampledBoxDimensions.Y, OversampledBoxDimensions.Y));
-                    double rLim = 0.5*(OversampledBoxDimensions.X / 2.0d + 2.0d * OversampledBoxDimensions.X / 8.0d);
+                    double rLim = OversampledBoxDimensions.X/2;// 0.5 *(OversampledBoxDimensions.X / 2.0d + 2.0d * OversampledBoxDimensions.X / 8.0d);
                     Mask.TransformValues((x, y, z, val) => 
                     {
                         double xx = Math.Pow(x - OversampledBoxDimensions.X / 2.0d, 2);
@@ -158,7 +161,7 @@ namespace Warp.NNModels
 
                         return (float)(r<rLim?1 - r / rLim:0); 
                     });
-                    Mask.WriteMRC("TensorMaxMask.mrc", true);
+                    //Mask.WriteMRC("TensorMaxMask.mrc", true);
                     GPU.CopyDeviceToDevice(Mask.GetDevice(Intent.Read), TensorMaxMask[i].DataPtr(), Mask.ElementsReal);
 
                     Mask.Dispose();
@@ -169,7 +172,7 @@ namespace Warp.NNModels
                     Image Mask = new Image(new int3(OversampledBoxDimensions.X, OversampledBoxDimensions.Y, OversampledBoxDimensions.X));
                     Mask.Fill(1);
                     Mask.MaskSpherically(OversampledBoxDimensions.X / 2+ 2* OversampledBoxDimensions.X / 8, 0, true);
-                    Mask.WriteMRC(@"D:\GAN_recon_polcompl\mask.mrc", true);
+                    //Mask.WriteMRC(@"D:\GAN_recon_polcompl\mask.mrc", true);
                     GPU.CopyDeviceToDevice(Mask.GetDevice(Intent.Read), TensorVolumeMask[i].DataPtr(), Mask.ElementsReal);
 
                     Mask.Dispose();
@@ -192,7 +195,8 @@ namespace Warp.NNModels
             OptimizerDisc = Optimizer.Adam(Discriminators[0].GetParameters(), 0.01, 1e-8);
             OptimizerDisc.SetBetasAdam(0.5, 0.9);
 
-            ResultPredicted = new Image(IntPtr.Zero, new int3(BoxDimensions.X, BoxDimensions.Y, BatchSize));
+            ResultPredictedGen = new Image(IntPtr.Zero, new int3(BoxDimensions.X, BoxDimensions.Y, BatchSize));
+            ResultPredictedDisc = new Image(IntPtr.Zero, new int3(BoxDimensions.X, BoxDimensions.Y, BatchSize));
             ResultPredictedNoisy = new Image(IntPtr.Zero, new int3(BoxDimensions.X, BoxDimensions.Y, BatchSize));
         }
 
@@ -257,6 +261,7 @@ namespace Warp.NNModels
                                            Image imagesCTF,
                                            Image imagesReal,
                                            Image imagesnoise,
+                                           Image GaussianKernel,
                                            float learningRate,
                                            out Image prediction,
                                            out Image predictionNoisy,
@@ -266,9 +271,11 @@ namespace Warp.NNModels
             OptimizerGen.SetLearningRateAdam(learningRate * GenBoost);
             OptimizerGenVolume.SetLearningRateAdam(learningRate * GenVolumeBoost);
             OptimizerGen.ZeroGrad();
-
+            /*if (GaussianKernel != null)
+                GaussianKernel.WriteMRC("GaussianinGenerator.mrc", true);*/
             SyncParams();
-            ResultPredicted.GetDevice(Intent.Write);
+            ResultPredictedGen.GetDevice(Intent.Write);
+            ResultPredictedNoisy.GetDevice(Intent.Write);
 
             Helper.ForCPU(0, NDevices, NDevices, null, (i, threadID) =>
             {
@@ -283,6 +290,8 @@ namespace Warp.NNModels
                 GPU.CopyDeviceToDevice(imagesCTF.GetDeviceSlice(i * DeviceBatch, Intent.Read),
                                        TensorCTF[i].DataPtr(),
                                        DeviceBatch * BoxDimensions.ElementsFFT());
+                if(GaussianKernel != null)
+                    GPU.CopyDeviceToDevice(GaussianKernel.GetDevice(Intent.Read), TensorGaussian[i].DataPtr(), GaussianKernel.ElementsReal);
 
                 GPU.CopyHostToDevice(angles, TensorAngles[i].DataPtr(), DeviceBatch * 3);
 
@@ -292,24 +301,36 @@ namespace Warp.NNModels
                 using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
                 //using (TorchTensor PredictionNoisy = Generators[i].ApplyNoise(PredictionConv, TensorCTF[i]))
                 using (TorchTensor PredictionNoisy = PredictionConv.Add(TensorNoise[i]))
-                using (TorchTensor PredictionNoisyMean = doNormalizeInput?PredictionNoisy.Mean(new long[] { 2, 3 }, true):null) 
-                using (TorchTensor PredictionNoisyStd = doNormalizeInput?PredictionNoisy.Std(new long[] { 2, 3 }, true, true):null)
-                using (TorchTensor PredictionNoisyNormalized = doNormalizeInput?(PredictionNoisy - PredictionNoisyMean) /(PredictionNoisyStd + 1e-4): PredictionNoisy)
-                using (TorchTensor PredictionNoisyMasked = doMaskProjections? PredictionNoisyNormalized.Mul(TensorMask[i]):PredictionNoisyNormalized)
-                using (TorchTensor IsItReal = Discriminators[i].Forward(PredictionNoisyMasked))
+                //using (TorchTensor PredictionNoisyMean = doNormalizeInput ? PredictionNoisy.Mean(new long[] { 2, 3 }, true) : null)
+                //using (TorchTensor PredictionNoisyStd = doNormalizeInput ? PredictionNoisy.Std(new long[] { 2, 3 }, true, true) : null)
+                //using (TorchTensor PredictionNoisyNormalized = doNormalizeInput ? (PredictionNoisy - PredictionNoisyMean) / (PredictionNoisyStd + 1e-4) : PredictionNoisy)
+                using (TorchTensor PredictionNoisyMasked = doMaskProjections ? PredictionNoisy.Mul(TensorMask[i]) : PredictionNoisy)
+                using (TorchTensor fft = GaussianKernel != null ? PredictionNoisyMasked.rfftn(new long[] { 2, 3 }) : null)
+                using (TorchTensor conv = GaussianKernel != null ? fft.Mul(TensorGaussian[i].rfftn(new long[] { 2, 3 })) : null)
+                using (TorchTensor ifft = GaussianKernel != null ? conv.irfftn(new long[] { 2, 3 }) : null)
+                using (TorchTensor IsItReal = Discriminators[i].Forward(GaussianKernel != null ? ifft : PredictionNoisyMasked))
                 using (TorchTensor Loss = ((-1) * IsItReal).Mean())
+                //using (TorchTensor Loss = (PredictionNoisyMasked - TensorTrueImages[i]).Pow(2).Mean())
                 {
 
                     GPU.CopyDeviceToDevice(Prediction.DataPtr(),
-                                           ResultPredicted.GetDeviceSlice(i * DeviceBatch, Intent.Write),
+                                           ResultPredictedGen.GetDeviceSlice(i * DeviceBatch, Intent.Write),
                                            DeviceBatch * (int)BoxDimensions.Elements());
+
+
                     GPU.CopyDeviceToDevice(PredictionNoisyMasked.DataPtr(),
                                            ResultPredictedNoisy.GetDeviceSlice(i * DeviceBatch, Intent.Write),
                                            DeviceBatch * (int)BoxDimensions.Elements());
+                    //imagesCTF.WriteMRC("imagesCTF.mrc", true);
+                    //imagesReal.WriteMRC("imagesReal.mrc", true);
+                    //imagesnoise.WriteMRC("imagesnoise.mrc", true);
+                    //ResultPredictedGen.WriteMRC("Prediction.mrc", true);
+                    //ResultPredictedNoisy.WriteMRC("PredictionNoisyMasked.mrc", true);
+
                     if (i == 0)
                         GPU.CopyDeviceToHost(Loss.DataPtr(), ResultLoss, 1);
 
-                    Loss.Backward(TensorOne[i]);
+                    Loss.Backward();
                 }
                 /*
                 using (TorchTensor thisVolume = Generators[i].GetParameters()[0])
@@ -325,18 +346,19 @@ namespace Warp.NNModels
 
             GatherGrads();
             gradNorm = Generators[0].Clip_Gradients(generator_grad_clip_val);
+            gradNorm = 0.0d;
             OptimizerGen.Step();
             OptimizerGenVolume.Step();
-            prediction = ResultPredicted;
+            prediction = ResultPredictedGen;
+            //prediction.WriteMRC("PredictionInTrainingFunc.mrc", true);
             prediction.FreeDevice();
             predictionNoisy = ResultPredictedNoisy;
+            //predictionNoisy.WriteMRC("predictionNoisyInTrainingFunc.mrc", true);
             predictionNoisy.FreeDevice();
             loss = ResultLoss;
-            using (TorchTensor thisMaxMask = TensorMaxMask[0].Mul(Math.Min(numGenIt, 100)/100.0))
-            { 
-                Generators[0].ApplY_Volume_Mask(TensorBinaryMask[0], thisMaxMask); 
-            }
-            
+            double multiplicator = Math.Min((double)numGenIt / 1000, 1.0) * (-2.0 / 100);
+            Generators[0].ApplY_Volume_Mask(TensorBinaryMask[0], TensorMaxMask[0], multiplicator); 
+
             numGenIt++;
         }
 
@@ -344,6 +366,7 @@ namespace Warp.NNModels
                                                Image imagesReal,
                                                Image imagesCTF,
                                                Image imagesNoise,
+                                               Image GaussianKernel,
                                                float learningRate,
                                                float penaltyLambda,
                                                out Image prediction,
@@ -354,9 +377,10 @@ namespace Warp.NNModels
         {
             OptimizerDisc.SetLearningRateAdam(learningRate);
             OptimizerDisc.ZeroGrad();
-
+            /*if(GaussianKernel != null)
+            GaussianKernel.WriteMRC("GaussianinDiscriminator.mrc", true);*/
             SyncParams();
-            ResultPredicted.GetDevice(Intent.Write);
+            ResultPredictedDisc.GetDevice(Intent.Write);
             Helper.ForCPU(0, NDevices, NDevices, null, (i, threadID) =>
             {
                 Discriminators[i].Train();
@@ -374,13 +398,14 @@ namespace Warp.NNModels
 
                 float LossWasserstein = 0;
 
-                using (TorchTensor TrueImageMean = doNormalizeInput ? TensorTrueImages[i].Mean(new long[] { 2, 3 }, true) : null)
-                using (TorchTensor TrueImageStd = doNormalizeInput ? TensorTrueImages[i].Std(new long[] { 2, 3 }, true, true) : null)
-                using (TorchTensor TrueImageNormalized = doNormalizeInput ? ((TensorTrueImages[i] - TrueImageMean) / (TrueImageStd + 1e-4)) : null)
-                using (TorchTensor realInput = doMaskProjections ? 
-                    (doNormalizeInput ? TrueImageNormalized.Mul(TensorMask[i]) : TensorTrueImages[i].Mul(TensorMask[i]))
-                  : (doNormalizeInput ? TrueImageNormalized : TensorTrueImages[i]))
-                using (TorchTensor IsTrueReal = Discriminators[i].Forward(realInput))
+                //using (TorchTensor TrueImageMean = doNormalizeInput ? TensorTrueImages[i].Mean(new long[] { 2, 3 }, true) : null)
+                //using (TorchTensor TrueImageStd = doNormalizeInput ? TensorTrueImages[i].Std(new long[] { 2, 3 }, true, true) : null)
+                //using (TorchTensor TrueImageNormalized = doNormalizeInput ? ((TensorTrueImages[i] - TrueImageMean) / (TrueImageStd + 1e-4)) : null)
+                using (TorchTensor realInput = doMaskProjections ? TensorTrueImages[i].Mul(TensorMask[i]) : null)
+                using (TorchTensor fft = GaussianKernel != null ? (doMaskProjections ? realInput : TensorTrueImages[i]).rfftn(new long[] { 2, 3 }) : null)
+                using (TorchTensor conv = GaussianKernel != null ? fft.Mul(TensorGaussian[i].rfftn(new long[] { 2, 3 })) : null)
+                using (TorchTensor ifft = GaussianKernel != null ? conv.irfftn(new long[] { 2, 3 }) : null)
+                using (TorchTensor IsTrueReal = Discriminators[i].Forward(GaussianKernel != null ? ifft : (doMaskProjections ? realInput : TensorTrueImages[i])))
                 using (TorchTensor IsTrueRealNeg = IsTrueReal * (-1))
                 using (TorchTensor LossReal = IsTrueRealNeg.Mean())
                 {
@@ -397,18 +422,21 @@ namespace Warp.NNModels
                     using (TorchTensor PredictionConv = PredictionFTConv.irfftn(new long[] { 2, 3 }))
                     //using (TorchTensor PredictionNoisy = Generators[i].ApplyNoise(PredictionConv, TensorCTF[i]))
                     using (TorchTensor PredictionNoisy = PredictionConv.Add(TensorNoise[i]))
-                    using (TorchTensor PredictionNoisyMean = doNormalizeInput ? PredictionNoisy.Mean(new long[] { 2, 3 }, true) : null)
-                    using (TorchTensor PredictionNoisyStd = doNormalizeInput ? PredictionNoisy.Std(new long[] { 2, 3 }, true, true) : null)
-                    using (TorchTensor PredictionNoisyNormalized = doNormalizeInput ? (PredictionNoisy - PredictionNoisyMean) / (PredictionNoisyStd + 1e-4) : null)
+                    //using (TorchTensor PredictionNoisyMean = doNormalizeInput ? PredictionNoisy.Mean(new long[] { 2, 3 }, true) : null)
+                    //using (TorchTensor PredictionNoisyStd = doNormalizeInput ? PredictionNoisy.Std(new long[] { 2, 3 }, true, true) : null)
+                    //using (TorchTensor PredictionNoisyNormalized = doNormalizeInput ? (PredictionNoisy - PredictionNoisyMean) / (PredictionNoisyStd + 1e-4) : null)
                     using (TorchTensor PredictedInput = doMaskProjections ?
-                          (doNormalizeInput ? PredictionNoisyNormalized.Mul(TensorMask[i]) : PredictionConv.Mul(TensorMask[i]))
-                        : (doNormalizeInput ? PredictionNoisyNormalized : PredictionConv))
+                          ( PredictionConv.Mul(TensorMask[i]))
+                        : (PredictionConv))
                     using (TorchTensor PredictedInputDetached = PredictedInput.Detach())
-                    using (TorchTensor IsFakeReal = Discriminators[i].Forward(PredictedInput))
+                    using (TorchTensor fftT = GaussianKernel != null ? PredictedInputDetached.rfftn(new long[] { 2, 3 }) : null)
+                    using (TorchTensor convT = GaussianKernel != null ? fftT.Mul(TensorGaussian[i].rfftn(new long[] { 2, 3 })) : null)
+                    using (TorchTensor ifftT = GaussianKernel != null ? convT.irfftn(new long[] { 2, 3 }) : null)
+                    using (TorchTensor IsFakeReal = Discriminators[i].Forward(GaussianKernel != null ? ifftT : PredictedInputDetached))
                     using (TorchTensor LossFake = IsFakeReal.Mean())
                     {
                         GPU.CopyDeviceToDevice(PredictedInput.DataPtr(),
-                                               ResultPredicted.GetDeviceSlice(i * DeviceBatch, Intent.Write),
+                                               ResultPredictedDisc.GetDeviceSlice(i * DeviceBatch, Intent.Write),
                                                DeviceBatch * (int)BoxDimensions.Elements());
                         if (i == 0)
                         {
@@ -420,7 +448,7 @@ namespace Warp.NNModels
                         LossFake.Backward();
                         if (penaltyLambda > 0.0)
                         {
-                            using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(realInput, PredictedInput, penaltyLambda))
+                            using (TorchTensor Penalty = Discriminators[i].PenalizeGradient(doMaskProjections ? realInput : TensorTrueImages[i], PredictedInput, penaltyLambda))
                             {
                                 Penalty.Backward();
                             }
@@ -433,7 +461,7 @@ namespace Warp.NNModels
             gradNorm = Discriminators[0].Clip_Gradients(discriminator_grad_clip_val);
             OptimizerDisc.Step();
 
-            prediction = ResultPredicted;
+            prediction = ResultPredictedDisc;
             prediction.FreeDevice();
             lossWasserstein = ResultLoss;
             lossReal = ResultLossDiscReal;
@@ -470,7 +498,7 @@ namespace Warp.NNModels
                 {
                     IsDisposed = true;
 
-                    ResultPredicted.Dispose();
+                    ResultPredictedGen.Dispose();
 
                     for (int i = 0; i < NDevices; i++)
                     {

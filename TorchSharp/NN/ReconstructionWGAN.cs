@@ -77,13 +77,46 @@ namespace TorchSharp.NN
         }
         
         [DllImport("LibTorchSharp")]
-        private static extern void THSNN_ReconstructionWGANGenerator_apply_volume_masks(Module.HType module, IntPtr binaryMask, IntPtr maxMask);
+        private static extern void THSNN_ReconstructionWGANGenerator_apply_volume_masks(Module.HType module, IntPtr binaryMask, IntPtr maxMask, double multiplicator);
 
-        public void ApplY_Volume_Mask(TorchTensor binaryMask, TorchTensor maxMask)
+        public void ApplY_Volume_Mask(TorchTensor binaryMask, TorchTensor maxMask, double multiplicator)
         {
-            THSNN_ReconstructionWGANGenerator_apply_volume_masks(handle, binaryMask.Handle, maxMask.Handle);
+            THSNN_ReconstructionWGANGenerator_apply_volume_masks(handle, binaryMask.Handle, maxMask.Handle, multiplicator);
         }
 
+    }
+
+    public class ReconstructionWGANGeneratorSym : Module
+    {
+        internal ReconstructionWGANGeneratorSym(IntPtr handle, IntPtr boxedHandle) : base(handle, boxedHandle) { }
+
+        [DllImport("LibTorchSharp")]
+        private static extern double THSNN_ReconstructionWGANGeneratorSym_clip_gradient(Module.HType module, double clip_Value);
+
+        public double Clip_Gradients(double clip_Value)
+        {
+            return THSNN_ReconstructionWGANGeneratorSym_clip_gradient(handle, clip_Value);
+        }
+
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSNN_ReconstructionWGANGeneratorSym_forward(Module.HType module, IntPtr angles, bool do_shift);
+
+        public TorchTensor Forward(TorchTensor angles, bool do_shift)
+        {
+            var res = THSNN_ReconstructionWGANGeneratorSym_forward(handle, angles.Handle, do_shift);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
+
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSNN_ReconstructionWGANGeneratorSym_get_volume(Module.HType module);
+
+        public TorchTensor Get_Volume()
+        {
+            var res = THSNN_ReconstructionWGANGeneratorSym_get_volume(handle);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
     }
     public static partial class Modules
     {
@@ -95,6 +128,16 @@ namespace TorchSharp.NN
             var res = THSNN_ReconstructionWGANGenerator_ctor(volume.Handle, boxsize, out var boxedHandle);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new ReconstructionWGANGenerator(res, boxedHandle);
+        }
+
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSNN_ReconstructionWGANGeneratorSym_ctor(long boxsize, out IntPtr pBoxedModule);
+
+        static public ReconstructionWGANGeneratorSym ReconstructionWGANGeneratorSym(long boxsize)
+        {
+            var res = THSNN_ReconstructionWGANGeneratorSym_ctor(boxsize, out var boxedHandle);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new ReconstructionWGANGeneratorSym(res, boxedHandle);
         }
     }
 
@@ -156,13 +199,81 @@ namespace TorchSharp.NN
     public static partial class Modules
     {
         [DllImport("LibTorchSharp")]
-        private static extern IntPtr THSNN_ReconstructionWGANDiscriminator_ctor(out IntPtr pBoxedModule, long boxsize);
+        private static extern IntPtr THSNN_ReconstructionWGANDiscriminator_ctor(out IntPtr pBoxedModule, long boxsize, bool normalizeInput);
 
-        static public ReconstructionWGANDiscriminator ReconstructionWGANDiscriminator(long boxsize)
+        static public ReconstructionWGANDiscriminator ReconstructionWGANDiscriminator(long boxsize, bool normalizeInput)
         {
-            var res = THSNN_ReconstructionWGANDiscriminator_ctor(out var boxedHandle, boxsize);
+            var res = THSNN_ReconstructionWGANDiscriminator_ctor(out var boxedHandle, boxsize, normalizeInput);
             if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
             return new ReconstructionWGANDiscriminator(res, boxedHandle);
+        }
+    }
+
+    public class ReconstructionWGANSimpleCritic : Module
+    {
+
+        internal ReconstructionWGANSimpleCritic(IntPtr handle, IntPtr boxedHandle) : base(handle, boxedHandle) { }
+
+        [DllImport("LibTorchSharp")]
+        private static extern double THSNN_ReconstructionWGANSimpleCritic_clip_gradient(Module.HType module, double clip_Value);
+
+        public double Clip_Gradients(double clip_Value)
+        {
+            return THSNN_ReconstructionWGANSimpleCritic_clip_gradient(handle, clip_Value);
+        }
+
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSNN_ReconstructionWGANSimpleCritic_forward(Module.HType module, IntPtr tensor);
+
+        public TorchTensor Forward(TorchTensor tensor)
+        {
+            //var norm = NormalizeProjection(tensor);
+            var res = THSNN_ReconstructionWGANSimpleCritic_forward(handle, tensor.Handle);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            //norm.Dispose();
+            return new TorchTensor(res);
+        }
+
+
+        public TorchTensor NormalizeProjection(TorchTensor t)
+        {
+            TorchTensor ret;
+            using (TorchTensor mean = t.Mean(new long[] { 2, 3 }, true))
+            using (TorchTensor std = t.Std(new long[] { 2, 3 }, true, true))
+            {
+                ret = (t - mean) / (std + 1e-6);
+            }
+            return ret;
+        }
+
+        [DllImport("LibTorchSharp")]
+        private static extern void THSNN_ReconstructionWGANSimpleCritic_clipweights(Module.HType module, double clip);
+
+        public void ClipWeights(double clip)
+        {
+            THSNN_ReconstructionWGANSimpleCritic_clipweights(handle, clip);
+        }
+
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSNN_ReconstructionWGANSimpleCritic_penalizegradient(Module.HType module, IntPtr real, IntPtr fake, float lambda);
+
+        public TorchTensor PenalizeGradient(TorchTensor real, TorchTensor fake, float lambda)
+        {
+            var res = THSNN_ReconstructionWGANSimpleCritic_penalizegradient(handle, real.Handle, fake.Handle, lambda);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new TorchTensor(res);
+        }
+    }
+    public static partial class Modules
+    {
+        [DllImport("LibTorchSharp")]
+        private static extern IntPtr THSNN_ReconstructionWGANSimpleCritic_ctor(out IntPtr pBoxedModule, long boxsize, IntPtr image);
+
+        static public ReconstructionWGANSimpleCritic ReconstructionWGANSimpleCritic(long boxsize, TorchTensor image)
+        {
+            var res = THSNN_ReconstructionWGANSimpleCritic_ctor(out var boxedHandle, boxsize, image.Handle);
+            if (res == IntPtr.Zero) { Torch.CheckForErrors(); }
+            return new ReconstructionWGANSimpleCritic(res, boxedHandle);
         }
     }
 }
